@@ -1,0 +1,15 @@
+[package]
+name = "emile"
+version = "0.1.0"
+authors = ["Geobert Quach <geobert@protonmail.com>"]
+edition = "2018"
+
+[dependencies]
+structopt = "0.3.3"
+anyhow = "1.0.17"
+toml = "0.5.3"
+serde = "1.0.101"
+serde_derive = "1.0.101"
+chrono = {version = "0.4.9", features = ["serde"]}
+slug = "0.1.4"
+termcolor = "1.0.5"
