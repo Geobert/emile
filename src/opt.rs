@@ -1,7 +1,7 @@
 use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
-#[structopt(name = "emile", about = "A workflow helper around zola.")]
+#[structopt(name = "emile", about = "A workflow helper for zola.")]
 pub enum Opt {
     /// Create a new post in drafts folder, with current date prepended to filename.
     New {

@@ -1,0 +1,10 @@
+{
+  "spellright.language": [
+  ],
+  "spellright.documentTypes": [
+    "markdown",
+    "latex",
+    "plaintext"
+  ],
+  "rust.all_targets": false
+}
