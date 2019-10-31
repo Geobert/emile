@@ -10,9 +10,11 @@ pub enum Opt {
     },
     /// Mark a post not draft anymore, move it to `posts` folder and build the website.
     Publish {
-        /// Title of the blog post
-        title: String,
+        /// Slug part of the file name
+        slug: String,
     },
+    /// Called by the git webhook
+    GitHook {},
     // Schedule { date },
-    // Unschedule { filename: String },
+    // Unschedule { filename: String }
 }

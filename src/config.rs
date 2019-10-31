@@ -3,7 +3,6 @@ use std::io::prelude::*;
 use std::path::{Path, PathBuf};
 
 use anyhow::{bail, Result};
-use chrono::NaiveDate;
 use serde_derive::{Deserialize, Serialize};
 use toml;
 
@@ -13,10 +12,12 @@ pub struct Config {
     pub drafts_creation_dir: Option<PathBuf>,
     // drafts published with `publish` command will be picked up from here. Path relative to root of the blog.
     pub drafts_consumption_dir: Option<PathBuf>,
-    // emile will prepend filename with this date
-    pub drafts_date: Option<NaiveDate>,
+    // emile will add this amount of year to the drafts to make it top of the list
+    pub drafts_year_shift: Option<i32>,
     // emile will basically copy this file from `template` folder to create a draft post
     pub draft_template: Option<String>,
+    // Destination for `publish` command.
+    pub publish_dest: Option<PathBuf>,
 }
 
 impl Config {
@@ -51,6 +52,9 @@ impl Config {
         if config.draft_template.is_none() {
             config.draft_template = Some("draft.html".to_string());
         }
+        if config.publish_dest.is_none() {
+            config.publish_dest = Some(PathBuf::from("content/"));
+        }
 
         Ok(config)
     }
@@ -61,8 +65,9 @@ impl Default for Config {
         Config {
             drafts_creation_dir: Some(PathBuf::from("content/drafts")),
             drafts_consumption_dir: Some(PathBuf::from("content/drafts")),
-            drafts_date: None,
+            drafts_year_shift: None,
             draft_template: Some("draft.html".to_string()),
+            publish_dest: None,
         }
     }
 }
