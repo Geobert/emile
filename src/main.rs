@@ -22,7 +22,7 @@ fn main() -> Result<()> {
             cmd::update_repo()?;
             publish::publish_post(&slug, &cfg)?;
             cmd::clean_jobs_list(&slug)?;
-            cmd::update_remote(&slug)
+            cmd::update_remote(&slug, &cfg)
         }
         Opt::GitHook {} => {
             cmd::update_repo()?;
@@ -43,5 +43,6 @@ fn main() -> Result<()> {
                 _ => bail!("unknown command: {}", command),
             }
         }
+        Opt::Unschedule { slug } => cmd::cancel_schedule(&slug),
     }
 }

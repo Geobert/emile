@@ -16,5 +16,7 @@ pub enum Opt {
     /// Called by the git webhook
     GitHook {},
     // Schedule { date },
-    // Unschedule { filename: String }
+    Unschedule {
+        slug: String,
+    },
 }
