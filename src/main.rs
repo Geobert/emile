@@ -44,5 +44,6 @@ fn main() -> Result<()> {
             }
         }
         Opt::Unschedule { slug } => cmd::cancel_schedule(&slug),
+        Opt::Schedule { date, slug } => cmd::schedule_publish(&date, &slug),
     }
 }
