@@ -4,6 +4,9 @@ version = "0.1.0"
 authors = ["Geobert Quach <geobert@protonmail.com>"]
 edition = "2018"
 
+[badges]
+azure-devops = { project = "geobert/emile", pipeline = "emile-CI", build = "2" }
+
 [dependencies]
 structopt = "0.3.3"
 anyhow = "1.0.18"
