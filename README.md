@@ -51,7 +51,7 @@ SUBCOMMANDS:
                   commands:
                    * `blog_build`: build the blog
                    * `blog_sched "at-format-date" post-slug: schedule the post
-                   * `blog_cancel post-slug`: cancel a previously scheduled post
+                   * `blog_unsched post-slug`: cancel a previously scheduled post
     help          Prints this message or the help of the given subcommand(s)
     new           Create a new post in drafts folder, with current date prepended to filename.
     publish       Mark a post as not draft, move it to `posts` folder, set the `date` field in front, build the
