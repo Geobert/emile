@@ -84,7 +84,7 @@ emile publish my-new-blog-post
 This command needs a `date` and a `slug`. `date` need to be between quotes and in the
 [`at`](https://linux.die.net/man/1/at) utility format.
 
-It schedule the post corresponding to the slug to be `publish`ed at the given `date`.
+It schedules the post corresponding to the slug to be `publish`ed at the given `date`.
 
 ```
 emile schedule "teatime tomorrow" my-new-blog-post
