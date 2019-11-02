@@ -14,7 +14,7 @@ pub struct Config {
     pub drafts_consumption_dir: Option<PathBuf>,
     // emile will add this amount of year to the drafts to make it top of the list
     pub drafts_year_shift: Option<i32>,
-    // emile will basically copy this file from `template` folder to create a draft post
+    // emile will take this file to create a draft post by adding `title`, `date` and `draft = true` in the frontmatter
     pub draft_template: Option<String>,
     // Destination for `publish` command.
     pub publish_dest: Option<PathBuf>,

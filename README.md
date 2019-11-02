@@ -27,7 +27,7 @@ drafts_creation_dir = "content/drafts/"
 drafts_consumption_dir = "content/drafts/"
 # emile will add this amount of year to the drafts to push it to the top of the list
 drafts_year_shift = 0
-# emile will take this file from `template` folder to create a draft post by adding `title`, `date` and `draft = true` in the frontmatter 
+# emile will take this file to create a draft post by adding `title`, `date` and `draft = true` in the frontmatter 
 draft_template = "templates/draft.html"
 # Destination for `publish` command.
 publish_dest = "content/"
