@@ -24,13 +24,13 @@ behaviours (default values shown):
 # drafts created with `new` command will end here. Path relative to root of the blog.
 drafts_creation_dir = "content/drafts/"
 # drafts published with `publish` command will be picked up from here. Path relative to root of the blog.
-drafts_consumption_dir = "content/drafts/",
+drafts_consumption_dir = "content/drafts/"
 # emile will add this amount of year to the drafts to push it to the top of the list
-drafts_year_shift = 0,
+drafts_year_shift = 0
 # emile will take this file from `template` folder to create a draft post by adding `title`, `date` and `draft = true` in the frontmatter 
-draft_template = "templates/draft.html",
+draft_template = "templates/draft.html"
 # Destination for `publish` command.
-publish_dest = "content/",
+publish_dest = "content/"
 ```
 
 ## Usage
