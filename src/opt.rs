@@ -18,7 +18,7 @@ pub enum Opt {
     /// message for commands:{n}
     /// * `blog_build`: build the blog{n}
     /// * `blog_sched "at-format-date" post-slug: schedule the post{n}
-    /// * `blog_cancel post-slug`: cancel a previously scheduled post
+    /// * `blog_unsched post-slug`: cancel a previously scheduled post
     GitHook {},
     /// Schedule a post. Ex: `emile schedule "tomorrow" my-post-slug`.
     Schedule {

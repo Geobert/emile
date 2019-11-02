@@ -38,24 +38,28 @@ pub fn create_draft(title: &str, cfg: &Config) -> Result<()> {
             .as_ref()
             .expect("Should have a filename at this point."),
     );
-    if !src.exists() {
-        bail!("can't find any template for a draft in `templates`. Please create `draft.html`.");
-    }
-    if !src.is_file() {
+    if src.exists() && !src.is_file() {
         bail!("`draft_template` is not a file.");
     }
-
-    let new_content = modify_post(&src, |line: &str, in_frontmatter| {
-        if in_frontmatter && line.starts_with("+++") {
-            Ok(format!(
-                "+++\ntitle = \"{}\"\ndate = {}\ndraft = true\n",
-                title,
-                date.format("%Y-%m-%d")
-            ))
-        } else {
-            Ok(format!("{}\n", line))
-        }
-    })?;
+    let new_content = if src.exists() {
+        modify_post(&src, |line: &str, in_frontmatter| {
+            if in_frontmatter && line.starts_with("+++") {
+                Ok(format!(
+                    "+++\ntitle = \"{}\"\ndate = {}\ndraft = true\n",
+                    title,
+                    date.format("%Y-%m-%d")
+                ))
+            } else {
+                Ok(format!("{}\n", line))
+            }
+        })?
+    } else {
+        format!(
+            "+++\ntitle = \"{}\"\ndate = {}\ndraft = true\n+++\n",
+            title,
+            date.format("%Y-%m-%d")
+        )
+    };
     fs::write(&dest, new_content)?;
     println!("Success: post `{}` created.", &dest.to_string_lossy());
     Ok(())

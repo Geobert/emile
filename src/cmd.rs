@@ -159,7 +159,7 @@ pub fn clean_jobs_list(slug: &str) -> Result<()> {
     Ok(())
 }
 
-pub fn cancel_schedule(slug: &str) -> Result<()> {
+pub fn unschedule_publish(slug: &str) -> Result<()> {
     let mut file = OpenOptions::new()
         .read(true)
         .write(true)

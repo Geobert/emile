@@ -36,14 +36,14 @@ fn main() -> Result<()> {
                     let slug = log.next().expect("No slug specified");
                     cmd::schedule_publish(date, slug)
                 }
-                "blog_cancel" => {
+                "blog_unsched" => {
                     let slug = log.next().expect("No slug specified");
-                    cmd::cancel_schedule(slug)
+                    cmd::unschedule_publish(slug)
                 }
                 _ => bail!("unknown command: {}", command),
             }
         }
-        Opt::Unschedule { slug } => cmd::cancel_schedule(&slug),
+        Opt::Unschedule { slug } => cmd::unschedule_publish(&slug),
         Opt::Schedule { date, slug } => cmd::schedule_publish(&date, &slug),
     }
 }
