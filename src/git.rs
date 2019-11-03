@@ -5,8 +5,14 @@ use crate::config::Config;
 use anyhow::{bail, Result};
 
 #[derive(Debug, PartialEq, Eq)]
+pub enum BlogCommand {
+    BlogBuild,
+    BlogSched,
+    BlogUnsched,
+}
+#[derive(Debug, PartialEq, Eq)]
 pub struct LogCommand {
-    pub command: String,
+    pub command: BlogCommand,
     pub date: Option<String>,
     pub slug: Option<String>,
 }
@@ -86,7 +92,7 @@ fn parse_last_log(log: &str) -> Result<LogCommand> {
     let command = split_log.next().expect("Empty log");
     Ok(match command {
         "blog_build" => LogCommand {
-            command: command.to_string(),
+            command: BlogCommand::BlogBuild,
             date: None,
             slug: None,
         },
@@ -101,9 +107,9 @@ fn parse_last_log(log: &str) -> Result<LogCommand> {
                 bail!("Malformed schedule command: {}", log);
             }
             let date = log[start + 1..end].to_string();
-            let slug = log[end..].trim().to_string();
+            let slug = log[end + 1..].trim().to_string();
             LogCommand {
-                command: command.to_string(),
+                command: BlogCommand::BlogSched,
                 date: Some(date),
                 slug: Some(slug),
             }
@@ -111,9 +117,9 @@ fn parse_last_log(log: &str) -> Result<LogCommand> {
         "blog_unsched" => {
             let slug = split_log.next().expect("No slug specified");
             LogCommand {
-                command: command.to_string(),
+                command: BlogCommand::BlogUnsched,
                 date: None,
-                slug: Some(slug.to_string()),
+                slug: Some(slug.trim().to_string()),
             }
         }
         _ => bail!("unknown command: {}", command),
@@ -127,7 +133,7 @@ mod tests {
     #[test]
     fn parse_log_schedule_command() {
         let expected = LogCommand {
-            command: "blog_sched".to_string(),
+            command: BlogCommand::BlogSched,
             date: Some("11:11 + 3 days".to_string()),
             slug: Some("my-post".to_string()),
         };

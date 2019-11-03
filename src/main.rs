@@ -13,6 +13,7 @@ mod publish;
 mod reslug;
 mod schedule;
 
+use git::BlogCommand;
 use opt::Opt;
 
 fn main() -> Result<()> {
@@ -39,16 +40,16 @@ fn main() -> Result<()> {
         Opt::GitHook {} => {
             git::update_repo()?;
             let log_command = git::get_last_log()?;
-            match log_command.command.as_str() {
-                "blog_build" => zola_build(),
-                "blog_sched" => schedule::schedule_publish(
+            match log_command.command {
+                BlogCommand::BlogBuild => zola_build(),
+                BlogCommand::BlogSched => schedule::schedule_publish(
                     &log_command.date.expect("No date specified."),
                     &log_command.slug.expect("Missing slug."),
                 ),
-                "blog_unsched" => {
+                BlogCommand::BlogUnsched => {
                     schedule::unschedule_publish(&log_command.slug.expect("Missing slug"))
                 }
-                _ => bail!("unknown command: {}", log_command.command),
+                _ => bail!("unknown command: {:?}", log_command.command),
             }
         }
         Opt::Unschedule { slug } => schedule::unschedule_publish(&slug),
