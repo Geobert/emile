@@ -4,6 +4,13 @@ use std::process::Command;
 use crate::config::Config;
 use anyhow::{bail, Result};
 
+#[derive(Debug, PartialEq, Eq)]
+pub struct LogCommand {
+    pub command: String,
+    pub date: Option<String>,
+    pub slug: Option<String>,
+}
+
 pub fn update_repo() -> Result<()> {
     match Command::new("git").arg("pull").output() {
         Ok(output) => {
@@ -47,7 +54,7 @@ pub fn update_remote(slug: &str, cfg: &Config) -> Result<()> {
     Ok(())
 }
 
-pub fn get_last_log() -> Result<String> {
+pub fn get_last_log() -> Result<LogCommand> {
     match Command::new("git")
         .arg("log")
         .arg("-n")
@@ -57,7 +64,7 @@ pub fn get_last_log() -> Result<String> {
     {
         Ok(output) => {
             if output.status.success() {
-                Ok(String::from_utf8_lossy(&output.stdout).to_string())
+                parse_last_log(&String::from_utf8_lossy(&output.stdout).to_string())
             } else {
                 bail!("{}", String::from_utf8_lossy(&output.stdout));
             }
@@ -70,5 +77,64 @@ pub fn get_last_log() -> Result<String> {
                 bail!("{}", e);
             }
         },
+    }
+}
+
+// returns (command, slug, date)
+fn parse_last_log(log: &str) -> Result<LogCommand> {
+    let mut split_log = log.split_ascii_whitespace();
+    let command = split_log.next().expect("Empty log");
+    Ok(match command {
+        "blog_build" => LogCommand {
+            command: command.to_string(),
+            date: None,
+            slug: None,
+        },
+        "blog_sched" => {
+            let start = log
+                .find('\"')
+                .expect("Should have starting quote in schedule command");
+            let end = log
+                .rfind('\"')
+                .expect("Should have ending quote in schedule command");
+            if start >= end || end >= log.len() {
+                bail!("Malformed schedule command: {}", log);
+            }
+            let date = log[start + 1..end].to_string();
+            let slug = log[end..].trim().to_string();
+            LogCommand {
+                command: command.to_string(),
+                date: Some(date),
+                slug: Some(slug),
+            }
+        }
+        "blog_unsched" => {
+            let slug = split_log.next().expect("No slug specified");
+            LogCommand {
+                command: command.to_string(),
+                date: None,
+                slug: Some(slug.to_string()),
+            }
+        }
+        _ => bail!("unknown command: {}", command),
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_log_schedule_command() {
+        let expected = LogCommand {
+            command: "blog_sched".to_string(),
+            date: Some("11:11 + 3 days".to_string()),
+            slug: Some("my-post".to_string()),
+        };
+
+        assert_eq!(
+            expected,
+            parse_last_log("blog_sched \"11:11 + 3 days\" my-post").unwrap()
+        );
     }
 }

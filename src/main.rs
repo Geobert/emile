@@ -38,21 +38,17 @@ fn main() -> Result<()> {
         }
         Opt::GitHook {} => {
             git::update_repo()?;
-            let log = git::get_last_log()?;
-            let mut log = log.split_ascii_whitespace();
-            let command = log.next().expect("Empty log");
-            match command {
+            let log_command = git::get_last_log()?;
+            match log_command.command.as_str() {
                 "blog_build" => zola_build(),
-                "blog_sched" => {
-                    let date = log.next().expect("No date specified");
-                    let slug = log.next().expect("No slug specified");
-                    schedule::schedule_publish(date, slug)
-                }
+                "blog_sched" => schedule::schedule_publish(
+                    &log_command.date.expect("No date specified."),
+                    &log_command.slug.expect("Missing slug."),
+                ),
                 "blog_unsched" => {
-                    let slug = log.next().expect("No slug specified");
-                    schedule::unschedule_publish(slug)
+                    schedule::unschedule_publish(&log_command.slug.expect("Missing slug"))
                 }
-                _ => bail!("unknown command: {}", command),
+                _ => bail!("unknown command: {}", log_command.command),
             }
         }
         Opt::Unschedule { slug } => schedule::unschedule_publish(&slug),
