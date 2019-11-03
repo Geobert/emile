@@ -35,30 +35,7 @@ publish_dest = "content/"
 
 ## Usage
 
-```
-emile 0.1.0
-A workflow companion for zola.
-
-USAGE:
-    emile <SUBCOMMAND>
-
-FLAGS:
-    -h, --help       Prints help information
-    -V, --version    Prints version information
-
-SUBCOMMANDS:
-    git-hook      Called by the git webhook. Performs update of the blog repo, and check last log commit message for
-                  commands:
-                   * `blog_build`: build the blog
-                   * `blog_sched "at-format-date" post-slug: schedule the post
-                   * `blog_unsched post-slug`: cancel a previously scheduled post
-    help          Prints this message or the help of the given subcommand(s)
-    new           Create a new post in drafts folder, with current date prepended to filename.
-    publish       Mark a post as not draft, move it to `posts` folder, set the `date` field in front, build the
-                  website, commit the changes and push them back
-    schedule      Schedule a post. Ex: `emile schedule "tomorrow" my-post-slug`.
-    unschedule    Cancel a schedule for the post with `slug`
-```
+`emile --help` and `emile <command> --help` to get all the details.
 
 ### new
 
@@ -67,13 +44,17 @@ The `new` command takes the title of your new blog post, between quotes:
 emile new "My new blog post"
 ```
 
+### reslug
+
+Rename the post's filename according to its title. If the provided path is a file, change
+only this file. If it's a directory, `emile` will change files starting with `-`. So you
+can mark files to be updated by prepending `-` to them.
+
 ### publish
 
 This command takes a `slug` as parameter. It will take the file corresponding to the
 `slug` in the `drafts_consumption_dir`, change its date and draft status and move it to
-the `publish_dest` directory.
-
-Then it calls `zola build`, commit the change and push them to `origin`.
+the `publish_dest` directory. The site is not rebuild after that.
 
 ```
 emile publish my-new-blog-post
@@ -84,7 +65,8 @@ emile publish my-new-blog-post
 This command needs a `date` and a `slug`. `date` need to be between quotes and in the
 [`at`](https://linux.die.net/man/1/at) utility format.
 
-It schedules the post corresponding to the slug to be `publish`ed at the given `date`.
+It schedules the post corresponding to the slug to be published and the site updated at
+the given `date`.
 
 ```
 emile schedule "teatime tomorrow" my-new-blog-post
@@ -97,6 +79,11 @@ This cancel a previous scheduled post by its slug.
 ```
 emile unschedule my-new-blog-post
 ```
+
+### publish-flow
+
+This does a `publish`, build the website, commit the changes and push them to origin.
+It is used by `schedule` command as the configured job will call `publish-flow`.
 
 ### git-hook
 

@@ -4,11 +4,10 @@ use std::path::PathBuf;
 use anyhow::{bail, Result};
 use chrono::Local;
 
-use crate::cmd;
 use crate::config::Config;
 use crate::post::modify_post;
 
-pub fn publish_post(slug: &str, cfg: &Config) -> Result<()> {
+pub fn publish_post(slug: &str, cfg: &Config) -> Result<String> {
     let drafts_consumption_dir = cfg
         .drafts_consumption_dir
         .as_ref()
@@ -54,10 +53,7 @@ pub fn publish_post(slug: &str, cfg: &Config) -> Result<()> {
     fs::write(&dest, new_content)?;
     fs::remove_file(&src)?;
 
-    cmd::zola_build()?;
-
-    println!("Success: post `{}` published", dest.to_string_lossy());
-    Ok(())
+    Ok(dest.to_string_lossy().to_string())
 }
 
 fn does_same_title_exist(slug: &str, dir: &PathBuf) -> Result<Option<DirEntry>> {

@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
@@ -8,9 +10,13 @@ pub enum Opt {
         /// Title of the blog post. Needs to be around quotes.
         title: String,
     },
-    /// Mark a post as not draft, move it to `posts` folder, set the `date` field in front, build
-    /// the website, commit the changes and push them back
+    /// Mark a post as not draft, move it to `posts` folder, set the `date` field in front.
     Publish {
+        /// Slug part of the file name
+        slug: String,
+    },
+    /// Do `publish`, build the website, commit the changes and push them to origin
+    PublishFlow {
         /// Slug part of the file name
         slug: String,
     },
@@ -31,5 +37,11 @@ pub enum Opt {
     Unschedule {
         /// slug part of the file name
         slug: String,
+    },
+    /// Rename the post's filename according to its title
+    Reslug {
+        /// If it's a file, it will rename it. If it's a directory, will rename files which file
+        /// name begins with `-`.
+        path: PathBuf,
     },
 }
