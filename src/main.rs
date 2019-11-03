@@ -49,7 +49,6 @@ fn main() -> Result<()> {
                 BlogCommand::BlogUnsched => {
                     schedule::unschedule_publish(&log_command.slug.expect("Missing slug"))
                 }
-                _ => bail!("unknown command: {:?}", log_command.command),
             }
         }
         Opt::Unschedule { slug } => schedule::unschedule_publish(&slug),
