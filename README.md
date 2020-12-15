@@ -1,6 +1,6 @@
 # UNMAINTAINED
 
-I'm stopped using Zola so I won't work on `emile` anymore. Feel free to fork it :)
+I stopped using Zola so I won't work on `emile` anymore. Feel free to fork it :)
 
 # Emile
 
