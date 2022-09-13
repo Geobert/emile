@@ -1,24 +1,21 @@
 use std::io::Write;
 
 use anyhow::{bail, Result};
-use config::Config;
-use structopt::StructOpt;
+use clap::Parser;
+use config::ConfigBuilder;
 
 mod config;
-mod git;
 mod new;
 mod opt;
 mod post;
 mod publish;
-mod reslug;
-mod schedule;
+mod watcher;
 
-use git::BlogCommand;
 use opt::Opt;
 
 fn main() -> Result<()> {
-    let opt = Opt::from_args();
-    let cfg = Config::get_config();
+    let opt = Opt::parse();
+    let cfg = ConfigBuilder::get_config();
 
     match opt {
         Opt::New { title } => new::create_draft(&title, &cfg),
@@ -30,30 +27,7 @@ fn main() -> Result<()> {
             );
             Ok(())
         }
-        Opt::PublishFlow { slug } => {
-            git::update_repo()?;
-            publish::publish_post(&slug, &cfg)?;
-            zola_build()?;
-            schedule::clean_jobs_list(&slug)?;
-            git::update_remote(&slug, &cfg)
-        }
-        Opt::GitHook {} => {
-            git::update_repo()?;
-            let log_command = git::get_last_log()?;
-            match log_command.command {
-                BlogCommand::BlogBuild => zola_build(),
-                BlogCommand::BlogSched => schedule::schedule_publish(
-                    &log_command.date.expect("No date specified."),
-                    &log_command.slug.expect("Missing slug."),
-                ),
-                BlogCommand::BlogUnsched => {
-                    schedule::unschedule_publish(&log_command.slug.expect("Missing slug"))
-                }
-            }
-        }
-        Opt::Unschedule { slug } => schedule::unschedule_publish(&slug),
-        Opt::Schedule { date, slug } => schedule::schedule_publish(&date, &slug),
-        Opt::Reslug { path } => reslug::reslug(&path),
+        Opt::Watch { website } => todo!(),
     }
 }
 

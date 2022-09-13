@@ -1,17 +1,19 @@
 [package]
 name = "emile"
-version = "0.2.1"
+version = "0.3.0"
 authors = ["Geobert Quach <geobert@protonmail.com>"]
-edition = "2018"
+edition = "2021"
 
 [badges]
 azure-devops = { project = "geobert/emile", pipeline = "emile-CI", build = "2" }
 
 [dependencies]
-structopt = "0.3.3"
-anyhow = "1.0.18"
-toml = "0.5.4"
-serde = "1.0.102"
-serde_derive = "1.0.102"
-chrono = { version = "0.4.9", features = ["serde"] }
+anyhow = "1.0.64"
+toml = "0.5.9"
+serde = "1.0.144"
+serde_derive = "1.0.144"
 slug = "0.1.4"
+notify = { version = "5.0.0", default-features = false, features = ["crossbeam-channel"] }
+clap = { version = "3.2.20", features = ["derive"] }
+time = { version = "0.3.14", features = ["serde", "formatting", "parsing"] }
+

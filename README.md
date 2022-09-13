@@ -1,7 +1,3 @@
-# UNMAINTAINED
-
-I stopped using Zola so I won't work on `emile` anymore. Feel free to fork it :)
-
 # Emile
 
 A workflow companion for [Zola](https://getzola.org).
