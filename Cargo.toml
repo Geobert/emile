@@ -8,12 +8,20 @@ edition = "2021"
 azure-devops = { project = "geobert/emile", pipeline = "emile-CI", build = "2" }
 
 [dependencies]
-anyhow = "1.0.64"
+anyhow = "1.0.65"
 toml = "0.5.9"
-serde = "1.0.144"
-serde_derive = "1.0.144"
+serde = "1.0.145"
+serde_derive = "1.0.145"
 slug = "0.1.4"
-notify = { version = "5.0.0", default-features = false, features = ["crossbeam-channel"] }
-clap = { version = "3.2.20", features = ["derive"] }
-time = { version = "0.3.14", features = ["serde", "formatting", "parsing"] }
+notify = { version = "5.0.0", default-features = false }
+clap = { version = "3.2.22", features = ["derive"] }
+time = { version = "0.3.15", features = ["serde", "formatting", "parsing", "macros"] }
+tracing = "0.1.36"
+lazy_static = "1.4.0"
+tokio = { version = "1.21.2", features = ["sync", "macros", "rt-multi-thread", "time"] }
+
+[dependencies.tracing-subscriber] 
+version = "0.3.15"
+default-features = false
+features = ["std", "env-filter", "ansi", "fmt", "smallvec", "parking_lot", "registry", "time"]
 

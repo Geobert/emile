@@ -1,27 +1,25 @@
 use std::fs::{self, DirEntry};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use anyhow::{bail, Result};
-use time::{format_description, OffsetDateTime};
+use time::OffsetDateTime;
 
-use crate::config::Config;
+use crate::config::SiteConfig;
 use crate::post::modify_post;
+use crate::DATE_SHORT_FORMAT;
 
-pub fn publish_post(slug: &str, cfg: &Config) -> Result<String> {
-    if !cfg.drafts_consumption_dir.exists() {
-        bail!(
-            "`{}` doesn't exist",
-            cfg.drafts_consumption_dir.to_string_lossy()
-        );
+pub fn publish_post(slug: &str, src_dir: &Path, cfg: &SiteConfig) -> Result<String> {
+    let filename = format!("{}.md", &slug);
+    let src = src_dir.join(&filename);
+    if !src.exists() {
+        bail!("`{}` doesn't exist", src.to_string_lossy());
     }
-    let src = cfg.drafts_consumption_dir.join(&format!("{}.md", &slug));
 
     let date = OffsetDateTime::now_utc().date();
     let new_content = modify_post(&src, |cur_line: &str, in_frontmatter| {
         if in_frontmatter {
             if cur_line.starts_with("date = ") {
-                let date_format = format_description::parse("[year]-[month]-[day]")?;
-                Ok(format!("date = {}\n", date.format(&date_format)?))
+                Ok(format!("date = {}\n", date.format(&DATE_SHORT_FORMAT)?))
             } else if !cur_line.starts_with("draft =") {
                 Ok(format!("{}\n", cur_line))
             } else {
@@ -32,13 +30,12 @@ pub fn publish_post(slug: &str, cfg: &Config) -> Result<String> {
         }
     })?;
 
-    let dest_filename = format!("{}.md", &slug);
-    let dest = cfg.publish_dest.join(&dest_filename);
+    let dest = cfg.publish_dest.join(&filename);
     if dest.exists() {
         bail!("file {} already exists.", dest.to_string_lossy());
     }
     if let Some(similar_file) = does_same_title_exist(slug, &cfg.publish_dest)? {
-        eprintln!(
+        bail!(
             "Warning: a post with a the same title exists: `{}`",
             similar_file.file_name().to_string_lossy()
         );

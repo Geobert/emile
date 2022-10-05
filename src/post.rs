@@ -7,6 +7,8 @@ use std::{
 use anyhow::{bail, Result};
 use time::{format_description::well_known::Rfc3339, OffsetDateTime, UtcOffset};
 
+use crate::DATE_SHORT_FORMAT;
+
 pub fn modify_post(
     path: &Path,
     mut operation: impl FnMut(&str, bool) -> Result<String>,
@@ -52,10 +54,16 @@ pub fn extract_date(path: &Path) -> Result<OffsetDateTime> {
                     bail!("Invalid `date`");
                 }
                 let date_str = date_split.get(1).unwrap();
-                return Ok(OffsetDateTime::parse(date_str, &Rfc3339)?.to_offset(UtcOffset::UTC));
+                let date = if date_str.trim().len() == 10 {
+                    OffsetDateTime::parse(&date_str, &DATE_SHORT_FORMAT)?
+                } else {
+                    OffsetDateTime::parse(date_str, &Rfc3339)?.to_offset(UtcOffset::UTC)
+                };
+                return Ok(date);
             }
+        } else {
+            bail!("No `date` in frontmatter")
         }
-        bail!("No `date` in frontmatter")
     }
     bail!("No `date` in frontmatter")
 }

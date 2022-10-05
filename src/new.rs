@@ -3,12 +3,13 @@ use std::path::PathBuf;
 
 use anyhow::{bail, Result};
 use slug::slugify;
-use time::{format_description, Date, OffsetDateTime};
+use time::{Date, OffsetDateTime};
 
-use crate::config::Config;
+use crate::config::SiteConfig;
 use crate::post::modify_post;
+use crate::DATE_SHORT_FORMAT;
 
-pub fn create_draft(title: &str, cfg: &Config) -> Result<()> {
+pub fn create_draft(title: &str, cfg: &SiteConfig) -> Result<()> {
     if !cfg.drafts_creation_dir.exists() {
         fs::create_dir_all(&cfg.drafts_creation_dir)?;
     }
@@ -34,14 +35,13 @@ pub fn create_draft(title: &str, cfg: &Config) -> Result<()> {
     if src.exists() && !src.is_file() {
         bail!("`draft_template` is not a file.");
     }
-    let date_format = format_description::parse("[year]-[month]-[day]")?;
     let new_content = if src.exists() {
         modify_post(&src, |line: &str, in_frontmatter| {
             if in_frontmatter && line.starts_with("+++") {
                 Ok(format!(
                     "+++\ntitle = \"{}\"\ndate = {}\ndraft = true\n",
                     title,
-                    date.format(&date_format)?
+                    date.format(&DATE_SHORT_FORMAT)?
                 ))
             } else {
                 Ok(format!("{}\n", line))
@@ -51,7 +51,7 @@ pub fn create_draft(title: &str, cfg: &Config) -> Result<()> {
         format!(
             "+++\ntitle = \"{}\"\ndate = {}\ndraft = true\n+++\n",
             title,
-            date.format(&date_format)?
+            date.format(&DATE_SHORT_FORMAT)?
         )
     };
     fs::write(&dest, new_content)?;

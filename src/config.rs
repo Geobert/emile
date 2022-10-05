@@ -2,11 +2,11 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::path::{Path, PathBuf};
 
-use anyhow::{bail, Result};
+use anyhow::Result;
 use serde_derive::Deserialize;
 
 #[derive(Debug, Deserialize)]
-pub struct Config {
+pub struct SiteConfig {
     // drafts created with `new` command will end here. Path relative to root of the blog.
     pub drafts_creation_dir: PathBuf,
     // drafts published with `publish` command will be picked up from here. Path relative to root of the blog.
@@ -21,10 +21,10 @@ pub struct Config {
     pub schedule_dir: PathBuf,
 }
 
-impl Config {}
+impl SiteConfig {}
 
 #[derive(Debug, Deserialize)]
-pub struct ConfigBuilder {
+pub struct SiteConfigBuilder {
     // drafts created with `new` command will end here. Path relative to root of the blog.
     pub drafts_creation_dir: Option<PathBuf>,
     // drafts published with `publish` command will be picked up from here. Path relative to root of the blog.
@@ -39,26 +39,26 @@ pub struct ConfigBuilder {
     pub schedule_dir: Option<PathBuf>,
 }
 
-impl ConfigBuilder {
+impl SiteConfigBuilder {
     // to be run from the website's directory
-    pub fn get_config() -> Config {
-        let cfg = ConfigBuilder::from_file("./emile.toml");
+    pub fn get_config() -> SiteConfig {
+        let cfg = SiteConfigBuilder::from_file("./emile.toml");
         if cfg.is_err() {
             eprintln!("Warning: failed to load `emile.toml`, fallback to default values");
         }
         cfg.unwrap_or_default()
     }
 
-    fn from_file<P: AsRef<Path>>(path: P) -> Result<Config> {
+    fn from_file<P: AsRef<Path>>(path: P) -> Result<SiteConfig> {
         let mut file = File::open(&path)?;
         let mut content = String::new();
         file.read_to_string(&mut content)?;
-        ConfigBuilder::parse(&content)
+        SiteConfigBuilder::parse(&content)
     }
 
-    fn parse(s: &str) -> Result<Config> {
-        let cfg_builder: ConfigBuilder = toml::from_str(s)?;
-        let config = Config {
+    fn parse(s: &str) -> Result<SiteConfig> {
+        let cfg_builder: SiteConfigBuilder = toml::from_str(s)?;
+        let config = SiteConfig {
             drafts_creation_dir: cfg_builder
                 .drafts_creation_dir
                 .unwrap_or_else(|| PathBuf::from("content/drafts")),
@@ -81,9 +81,9 @@ impl ConfigBuilder {
     }
 }
 
-impl Default for Config {
+impl Default for SiteConfig {
     fn default() -> Self {
-        Config {
+        SiteConfig {
             drafts_creation_dir: PathBuf::from("content/drafts"),
             drafts_consumption_dir: PathBuf::from("content/drafts"),
             drafts_year_shift: 0,
