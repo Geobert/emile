@@ -281,7 +281,7 @@ async fn schedule_next(
                 let instant = tokio::time::Instant::now() + duration;
                 tokio::spawn(async move {
                     if let Err(_) = tokio::time::timeout_at(instant, rx).await {
-                        tx_scheduler.send(SchedulerEvent::Scheduled(date));
+                        let _ = tx_scheduler.send(SchedulerEvent::Scheduled(date));
                     }
                 });
                 return Some(tx);
@@ -304,12 +304,10 @@ impl Scheduled {
         let cancel_tx = schedule_next(watcher, tx_scheduler).await;
         Self { cancel_tx }
     }
+}
 
-    pub async fn reschedule(
-        &mut self,
-        watcher: Arc<SiteWatcher>,
-        tx_scheduler: UnboundedSender<SchedulerEvent>,
-    ) {
+impl Drop for Scheduled {
+    fn drop(&mut self) {
         match self.cancel_tx.take() {
             Some(cancel_tx) => {
                 if let Err(e) = cancel_tx.send(()) {
@@ -318,18 +316,13 @@ impl Scheduled {
             }
             None => (),
         }
-
-        match schedule_next(watcher, tx_scheduler).await {
-            Some(tx) => {
-                self.cancel_tx.replace(tx);
-            }
-            None => (),
-        }
     }
 }
+
 lazy_static! {
     static ref SCHEDULED: Arc<Mutex<Option<Scheduled>>> = Arc::new(Mutex::new(None));
 }
+
 pub async fn start_scheduler(
     watcher: Arc<SiteWatcher>,
     tx_scheduler: UnboundedSender<SchedulerEvent>,
@@ -337,24 +330,15 @@ pub async fn start_scheduler(
 ) {
     while let Some(e) = rx_scheduler.recv().await {
         match e {
-            SchedulerEvent::Changed => match SCHEDULED.lock() {
-                Ok(mut scheduled) => {
-                    let option_scheduled = &mut *scheduled;
-                    match option_scheduled {
-                        Some(scheduled) => {
-                            scheduled
-                                .reschedule(watcher.clone(), tx_scheduler.clone())
-                                .await
-                        }
-                        _ => {
-                            scheduled.replace(
-                                Scheduled::new(watcher.clone(), tx_scheduler.clone()).await,
-                            );
-                        }
+            SchedulerEvent::Changed => {
+                let new_scheduled = Scheduled::new(watcher.clone(), tx_scheduler.clone()).await;
+                match SCHEDULED.lock() {
+                    Ok(mut locked_scheduled) => {
+                        locked_scheduled.replace(new_scheduled);
                     }
+                    Err(e) => error!("Failed to get lock on SCHEDULED: {:?}", e),
                 }
-                Err(e) => error!("Failed to get lock on SCHEDULED"),
-            },
+            }
             SchedulerEvent::Scheduled(date) => todo!(),
         }
     }

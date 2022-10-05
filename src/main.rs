@@ -64,8 +64,9 @@ async fn main() -> Result<()> {
             let schedule_watcher = change_watcher.clone();
             let (tx_scheduler, rx_scheduler) = tokio::sync::mpsc::unbounded_channel();
 
+            let tx_scheduler_for_spawn = tx_scheduler.clone();
             tokio::spawn(async move {
-                watcher::start_scheduler(schedule_watcher, tx_scheduler.clone(), rx_scheduler)
+                watcher::start_scheduler(schedule_watcher, tx_scheduler_for_spawn, rx_scheduler)
                     .await;
             });
 
