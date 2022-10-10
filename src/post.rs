@@ -5,9 +5,11 @@ use std::{
 };
 
 use anyhow::{bail, Result};
-use time::{format_description::well_known::Rfc3339, OffsetDateTime, UtcOffset};
+use time::{
+    format_description::well_known::Rfc3339, macros::format_description, Date, OffsetDateTime,
+};
 
-use crate::DATE_SHORT_FORMAT;
+use crate::config::SiteConfig;
 
 pub fn modify_post(
     path: &Path,
@@ -35,7 +37,7 @@ pub fn modify_post(
     Ok(new_content)
 }
 
-pub fn extract_date(path: &Path) -> Result<OffsetDateTime> {
+pub fn extract_date(path: &Path, cfg: &SiteConfig) -> Result<OffsetDateTime> {
     let file = File::open(path)?;
     let reader = BufReader::new(&file);
     let mut in_front = true;
@@ -53,11 +55,13 @@ pub fn extract_date(path: &Path) -> Result<OffsetDateTime> {
                 if date_split.len() != 2 {
                     bail!("Invalid `date`");
                 }
-                let date_str = date_split.get(1).unwrap();
-                let date = if date_str.trim().len() == 10 {
-                    OffsetDateTime::parse(&date_str, &DATE_SHORT_FORMAT)?
+                let date_str = date_split.get(1).unwrap().trim();
+                let date = if date_str.len() == 10 {
+                    Date::parse(&date_str, &format_description!("[year]-[month]-[day]"))?
+                        .with_hms(0, 0, 0)?
+                        .assume_offset(cfg.timezone)
                 } else {
-                    OffsetDateTime::parse(date_str, &Rfc3339)?.to_offset(UtcOffset::UTC)
+                    OffsetDateTime::parse(date_str, &Rfc3339)?
                 };
                 return Ok(date);
             }

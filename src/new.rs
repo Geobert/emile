@@ -3,11 +3,10 @@ use std::path::PathBuf;
 
 use anyhow::{bail, Result};
 use slug::slugify;
-use time::{Date, OffsetDateTime};
+use time::{format_description::well_known::Rfc3339, OffsetDateTime};
 
 use crate::config::SiteConfig;
 use crate::post::modify_post;
-use crate::DATE_SHORT_FORMAT;
 
 pub fn create_draft(title: &str, cfg: &SiteConfig) -> Result<()> {
     if !cfg.drafts_creation_dir.exists() {
@@ -16,11 +15,8 @@ pub fn create_draft(title: &str, cfg: &SiteConfig) -> Result<()> {
 
     let date = {
         let today = OffsetDateTime::now_utc();
-        Date::from_calendar_date(
-            today.year() + cfg.drafts_year_shift,
-            today.month(),
-            today.day(),
-        )?
+        let today = today.replace_year(today.year() + cfg.drafts_year_shift)?;
+        today.replace_offset(cfg.timezone)
     };
 
     let slug = slugify(title);
@@ -33,7 +29,7 @@ pub fn create_draft(title: &str, cfg: &SiteConfig) -> Result<()> {
     let mut src = PathBuf::from("./templates/");
     src.push(&cfg.draft_template);
     if src.exists() && !src.is_file() {
-        bail!("`draft_template` is not a file.");
+        bail!("`{}` is not a file.", cfg.draft_template);
     }
     let new_content = if src.exists() {
         modify_post(&src, |line: &str, in_frontmatter| {
@@ -41,7 +37,7 @@ pub fn create_draft(title: &str, cfg: &SiteConfig) -> Result<()> {
                 Ok(format!(
                     "+++\ntitle = \"{}\"\ndate = {}\ndraft = true\n",
                     title,
-                    date.format(&DATE_SHORT_FORMAT)?
+                    date.format(&Rfc3339)?
                 ))
             } else {
                 Ok(format!("{}\n", line))
@@ -51,7 +47,7 @@ pub fn create_draft(title: &str, cfg: &SiteConfig) -> Result<()> {
         format!(
             "+++\ntitle = \"{}\"\ndate = {}\ndraft = true\n+++\n",
             title,
-            date.format(&DATE_SHORT_FORMAT)?
+            date.format(&Rfc3339)?
         )
     };
     fs::write(&dest, new_content)?;

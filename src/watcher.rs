@@ -1,14 +1,15 @@
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, HashMap},
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
+    time::{Duration, Instant},
 };
 
 use anyhow::{Context, Result};
 use lazy_static::lazy_static;
-use notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
+use notify::{event::RemoveKind, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use time::OffsetDateTime;
-use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
+use tokio::sync::mpsc::UnboundedSender;
 use tracing::{debug, error, info};
 
 use crate::{config::SiteConfig, post::extract_date, publish::publish_post, zola_build};
@@ -22,7 +23,7 @@ pub enum SchedulerEvent {
 #[derive(Debug)]
 pub struct SiteWatcher {
     pub scheduled: Mutex<BTreeMap<OffsetDateTime, Vec<PathBuf>>>,
-    index: Mutex<BTreeMap<PathBuf, OffsetDateTime>>,
+    pub index: Mutex<BTreeMap<PathBuf, OffsetDateTime>>,
 }
 
 impl SiteWatcher {
@@ -44,9 +45,9 @@ impl SiteWatcher {
                 if path.file_name().expect("file with no name") == "_index.md" {
                     continue;
                 }
-
-                let date = extract_date(&path)?;
-                if date >= now {
+                debug!("Reading {}", path.to_string_lossy());
+                let date = extract_date(&path, cfg)?;
+                if date <= now {
                     need_publishing.push(path);
                 } else {
                     scheduled
@@ -80,12 +81,17 @@ impl SiteWatcher {
 
 pub async fn start_watching(
     s: Arc<SiteWatcher>,
-    cfg: &SiteConfig,
+    cfg: Arc<SiteConfig>,
     tx_scheduler: UnboundedSender<SchedulerEvent>,
 ) -> Result<()> {
     let (tx, rx) = std::sync::mpsc::channel();
 
-    debug!("getting watcher");
+    match DEBOUNCER.lock() {
+        Ok(mut debouncer) => debouncer.debounce = Duration::from_secs(cfg.debouncing),
+        Err(err) => error!("Failed to lock debouncer on `start_watching()`: {}", err),
+    }
+
+    debug!("starting watcher");
     let mut watcher = RecommendedWatcher::new(tx, notify::Config::default())
         .with_context(|| "Failed to create watcher")?;
 
@@ -114,17 +120,19 @@ pub async fn start_watching(
 
     let schedule_abs_dir = current_dir.join(&cfg.schedule_dir);
     let draft_abs_creation_dir = current_dir.join(&cfg.drafts_creation_dir);
-    let draft_abs_consumption_dir = current_dir.join(&cfg.drafts_consumption_dir);
 
     let cfg_abs = SiteConfig {
         drafts_creation_dir: draft_abs_creation_dir,
-        drafts_consumption_dir: draft_abs_consumption_dir,
         drafts_year_shift: cfg.drafts_year_shift,
         draft_template: cfg.draft_template.clone(),
         publish_dest: cfg.publish_dest.clone(),
         schedule_dir: schedule_abs_dir,
+        timezone: cfg.timezone,
+        debouncing: cfg.debouncing,
     };
 
+    debug!("watcher started");
+    let _ = tx_scheduler.send(SchedulerEvent::Changed);
     for res_evt in rx {
         match res_evt {
             Ok(evt) => {
@@ -136,6 +144,47 @@ pub async fn start_watching(
     Ok(())
 }
 
+struct EventRecord {
+    instant: Instant,
+}
+
+#[derive(Default)]
+struct Debouncer {
+    evts: HashMap<PathBuf, EventRecord>,
+    debounce: Duration,
+}
+
+impl Debouncer {
+    fn need_processing(&mut self, path: &Path) -> bool {
+        let mut res = false;
+        self.evts
+            .entry(path.to_path_buf())
+            .and_modify(|e| {
+                if e.instant.elapsed() > self.debounce {
+                    res = true
+                }
+                e.instant = std::time::Instant::now();
+            })
+            .or_insert_with(|| {
+                res = true;
+                EventRecord {
+                    instant: std::time::Instant::now(),
+                }
+            });
+
+        res
+    }
+
+    fn cleanup(&mut self) {
+        self.evts
+            .retain(|_, r| r.instant.elapsed() < Duration::from_secs(10));
+    }
+}
+
+lazy_static! {
+    static ref DEBOUNCER: Mutex<Debouncer> = Mutex::new(Debouncer::default());
+}
+
 async fn process_evt(
     evt: Event,
     s: Arc<SiteWatcher>,
@@ -143,42 +192,58 @@ async fn process_evt(
     cfg: &SiteConfig,
     tx_scheduler: &UnboundedSender<SchedulerEvent>,
 ) {
-    debug!("event: {:?}", evt);
-
     for path in &evt.paths {
-        // ignore directory changes
-        if !path.is_file() {
+        // ignore directory changes, if the file was removed, `Path::is_file()` returns false
+        // so we let pass Remove event (directories are unlikely to be removed)
+        if !path.is_file() && evt.kind != EventKind::Remove(RemoveKind::Any) {
             continue;
         }
-        debug!("path: {:?}", &path);
-        if path.starts_with(&cfg_abs.schedule_dir) {
-            process_schedule_evt(path, &evt, s.clone(), &cfg);
-            if let Err(e) = tx_scheduler.send(SchedulerEvent::Changed) {
-                error!("Error sending ScheduleEvent: {:?}", e)
+
+        // debouncing
+        let need_process = match DEBOUNCER.lock() {
+            Ok(mut debouncer) => debouncer.need_processing(&path),
+            Err(_) => {
+                error!("Fail to lock debouncer, let's process the event nonetheless");
+                true
             }
-        } else if path.starts_with(&cfg_abs.drafts_consumption_dir)
-            || path.starts_with(&cfg_abs.drafts_creation_dir)
-        {
-            // nothing to do
-        } else {
-            match zola_build() {
-                Ok(_) => info!("Build success after filesystem event ({:?})", evt),
-                Err(err) => error!(
-                    "Failed building after filesystem event `{:?}`: {}",
-                    evt, err
-                ),
+        };
+
+        if need_process {
+            debug!("path: {:?}", &path);
+            if path.starts_with(&cfg_abs.schedule_dir) {
+                process_schedule_evt(path, &evt, s.clone(), &cfg);
+                if let Err(e) = tx_scheduler.send(SchedulerEvent::Changed) {
+                    error!("Error sending ScheduleEvent: {:?}", e)
+                }
+            } else if path.starts_with(&cfg_abs.drafts_creation_dir) {
+                // nothing to do
+            } else {
+                match evt.kind {
+                    EventKind::Modify(_) | EventKind::Remove(_) => match zola_build() {
+                        Ok(_) => info!("Build success after filesystem event ({:?})", evt),
+                        Err(err) => error!(
+                            "Failed building after filesystem event `{:?}`: {}",
+                            evt, err
+                        ),
+                    },
+                    _ => (),
+                }
             }
         }
+    }
+
+    match DEBOUNCER.lock() {
+        Ok(mut debouncer) => debouncer.cleanup(),
+        Err(_) => error!("Error on locking debouncer for cleanup"),
     }
 }
 
 fn process_schedule_evt(path: &Path, evt: &Event, s: Arc<SiteWatcher>, cfg: &SiteConfig) {
     info!("Schedule directory changed");
-    let now = OffsetDateTime::now_utc();
     match evt.kind {
-        EventKind::Modify(_) => match extract_date(path) {
+        EventKind::Modify(_) => match extract_date(path, cfg) {
             Ok(date) => {
-                if date >= now {
+                if date <= OffsetDateTime::now_utc() {
                     match publish_post(
                         &path
                             .file_stem()
@@ -220,17 +285,8 @@ fn process_schedule_evt(path: &Path, evt: &Event, s: Arc<SiteWatcher>, cfg: &Sit
                                     date
                                 });
                         }
-                        (Err(err_i), Err(err_s)) => {
-                            error!(
-                                "Error getting lock on index and scheduled btree: {:#?}, {:#?}",
-                                err_i, err_s
-                            )
-                        }
-                        (Err(err_i), _) => {
-                            error!("Error getting lock on index btree: {:#?}", err_i)
-                        }
-                        (_, Err(err_s)) => {
-                            error!("Error getting lock on scheduled btree: {:#?}", err_s)
+                        _ => {
+                            error!("Error getting lock on SiteWatcher")
                         }
                     }
                 }
@@ -248,98 +304,11 @@ fn process_schedule_evt(path: &Path, evt: &Event, s: Arc<SiteWatcher>, cfg: &Sit
                         index.remove(path);
                     }
                 }
-                (Err(err_i), Err(err_s)) => {
-                    error!(
-                        "Error getting lock on index and scheduled btree: {:#?}, {:#?}",
-                        err_i, err_s
-                    )
-                }
-                (Err(err_i), _) => {
-                    error!("Error getting lock on index btree: {:#?}", err_i)
-                }
-                (_, Err(err_s)) => {
-                    error!("Error getting lock on scheduled btree: {:#?}", err_s)
+                _ => {
+                    error!("Error getting lock on SiteWatcher")
                 }
             }
         }
         _ => {}
-    }
-}
-
-async fn schedule_next(
-    watcher: Arc<SiteWatcher>,
-    tx_scheduler: UnboundedSender<SchedulerEvent>,
-) -> Option<tokio::sync::oneshot::Sender<()>> {
-    let (tx, rx) = tokio::sync::oneshot::channel();
-    match watcher.scheduled.lock() {
-        Ok(scheduled) => {
-            if let Some(date) = scheduled.keys().next() {
-                let date = (*date).clone();
-                let now = OffsetDateTime::now_utc();
-                let duration = date - now;
-                let duration = std::time::Duration::from_secs(duration.whole_seconds() as u64);
-                let instant = tokio::time::Instant::now() + duration;
-                tokio::spawn(async move {
-                    if let Err(_) = tokio::time::timeout_at(instant, rx).await {
-                        let _ = tx_scheduler.send(SchedulerEvent::Scheduled(date));
-                    }
-                });
-                return Some(tx);
-            }
-        }
-        Err(err) => error!("Error getting lock on scheduled: {:?}", err),
-    }
-    return None;
-}
-
-struct Scheduled {
-    cancel_tx: Option<tokio::sync::oneshot::Sender<()>>,
-}
-
-impl Scheduled {
-    pub async fn new(
-        watcher: Arc<SiteWatcher>,
-        tx_scheduler: UnboundedSender<SchedulerEvent>,
-    ) -> Self {
-        let cancel_tx = schedule_next(watcher, tx_scheduler).await;
-        Self { cancel_tx }
-    }
-}
-
-impl Drop for Scheduled {
-    fn drop(&mut self) {
-        match self.cancel_tx.take() {
-            Some(cancel_tx) => {
-                if let Err(e) = cancel_tx.send(()) {
-                    error!("Error on cancelling schedule: {:?}", e)
-                }
-            }
-            None => (),
-        }
-    }
-}
-
-lazy_static! {
-    static ref SCHEDULED: Arc<Mutex<Option<Scheduled>>> = Arc::new(Mutex::new(None));
-}
-
-pub async fn start_scheduler(
-    watcher: Arc<SiteWatcher>,
-    tx_scheduler: UnboundedSender<SchedulerEvent>,
-    mut rx_scheduler: UnboundedReceiver<SchedulerEvent>,
-) {
-    while let Some(e) = rx_scheduler.recv().await {
-        match e {
-            SchedulerEvent::Changed => {
-                let new_scheduled = Scheduled::new(watcher.clone(), tx_scheduler.clone()).await;
-                match SCHEDULED.lock() {
-                    Ok(mut locked_scheduled) => {
-                        locked_scheduled.replace(new_scheduled);
-                    }
-                    Err(e) => error!("Failed to get lock on SCHEDULED: {:?}", e),
-                }
-            }
-            SchedulerEvent::Scheduled(date) => todo!(),
-        }
     }
 }

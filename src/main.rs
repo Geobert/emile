@@ -3,30 +3,22 @@ use std::{io::Write, sync::Arc};
 use anyhow::{bail, Result};
 use clap::Parser;
 use config::SiteConfigBuilder;
-use lazy_static::lazy_static;
 
 mod config;
 mod new;
 mod opt;
 mod post;
 mod publish;
+mod scheduler;
 mod watcher;
 
 use opt::Opt;
-use time::{
-    format_description::{self, FormatItem},
-    macros::format_description,
-};
+use time::macros::format_description;
 use tracing_subscriber::{
     fmt::time::UtcTime, prelude::__tracing_subscriber_SubscriberExt, util::SubscriberInitExt,
     EnvFilter,
 };
 use watcher::SiteWatcher;
-
-lazy_static! {
-    static ref DATE_SHORT_FORMAT: Vec<FormatItem<'static>> =
-        format_description::parse("[year]-[month]-[day]").unwrap();
-}
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -35,7 +27,7 @@ async fn main() -> Result<()> {
             tracing_subscriber::fmt::layer()
                 .compact()
                 .with_timer(UtcTime::new(format_description!(
-                    "[year]-[month]-[day] [hour]:[minute]:[second]"
+                    "[year repr:last_two]-[month]-[day] [hour]:[minute]:[second]"
                 )))
                 .with_target(false),
         )
@@ -50,7 +42,7 @@ async fn main() -> Result<()> {
         }
         Opt::Publish { slug } => {
             let cfg = SiteConfigBuilder::get_config();
-            let dest = publish::publish_post(&slug, &cfg.drafts_consumption_dir, &cfg)?;
+            let dest = publish::publish_post(&slug, &cfg.drafts_creation_dir, &cfg)?;
             println!(
                 "Success: post `{}` published. Call `zola build` to rebuild the site.",
                 dest
@@ -59,18 +51,24 @@ async fn main() -> Result<()> {
         }
         Opt::Watch { website } => {
             std::env::set_current_dir(website)?;
-            let cfg = SiteConfigBuilder::get_config();
+            let cfg = Arc::new(SiteConfigBuilder::get_config());
             let change_watcher = Arc::new(SiteWatcher::new(&cfg)?);
             let schedule_watcher = change_watcher.clone();
             let (tx_scheduler, rx_scheduler) = tokio::sync::mpsc::unbounded_channel();
 
             let tx_scheduler_for_spawn = tx_scheduler.clone();
+            let cfg_for_spawn = cfg.clone();
             tokio::spawn(async move {
-                watcher::start_scheduler(schedule_watcher, tx_scheduler_for_spawn, rx_scheduler)
-                    .await;
+                scheduler::start_scheduler(
+                    schedule_watcher,
+                    cfg_for_spawn,
+                    tx_scheduler_for_spawn,
+                    rx_scheduler,
+                )
+                .await;
             });
 
-            watcher::start_watching(change_watcher, &cfg, tx_scheduler).await?;
+            watcher::start_watching(change_watcher, cfg, tx_scheduler).await?;
             Ok(())
         }
     }

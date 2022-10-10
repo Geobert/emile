@@ -2,11 +2,10 @@ use std::fs::{self, DirEntry};
 use std::path::Path;
 
 use anyhow::{bail, Result};
-use time::OffsetDateTime;
+use time::{format_description::well_known::Rfc3339, OffsetDateTime};
 
 use crate::config::SiteConfig;
 use crate::post::modify_post;
-use crate::DATE_SHORT_FORMAT;
 
 pub fn publish_post(slug: &str, src_dir: &Path, cfg: &SiteConfig) -> Result<String> {
     let filename = format!("{}.md", &slug);
@@ -15,11 +14,11 @@ pub fn publish_post(slug: &str, src_dir: &Path, cfg: &SiteConfig) -> Result<Stri
         bail!("`{}` doesn't exist", src.to_string_lossy());
     }
 
-    let date = OffsetDateTime::now_utc().date();
+    let date = OffsetDateTime::now_utc().to_offset(cfg.timezone);
     let new_content = modify_post(&src, |cur_line: &str, in_frontmatter| {
         if in_frontmatter {
             if cur_line.starts_with("date = ") {
-                Ok(format!("date = {}\n", date.format(&DATE_SHORT_FORMAT)?))
+                Ok(format!("date = {}\n", date.format(&Rfc3339)?))
             } else if !cur_line.starts_with("draft =") {
                 Ok(format!("{}\n", cur_line))
             } else {
