@@ -32,7 +32,7 @@ publish_dest = "content/"
 # Scheduling directory (see below)
 schedule_dir = "content/drafts/scheduled/"
 # Timezone relative to UTC you're writing the post in
-timezone = 1
+timezone = 0
 ```
 
 ## Usage
