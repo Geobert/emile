@@ -12,7 +12,7 @@ use time::OffsetDateTime;
 use tokio::sync::mpsc::UnboundedSender;
 use tracing::{debug, error, info};
 
-use crate::{config::SiteConfig, post::extract_date, publish::publish_post, zola_build};
+use crate::{config::SiteConfig, post::extract_date, zola_build};
 
 #[derive(Debug)]
 pub enum SchedulerEvent {
@@ -30,42 +30,30 @@ impl SiteWatcher {
     pub fn new(cfg: &SiteConfig) -> Result<Self> {
         // read scheduled posts and see if any needs publishing
         let sched_dir = &cfg.schedule_dir;
-        let now = OffsetDateTime::now_utc();
-        let mut need_publishing = Vec::new();
+        let mut scheduled: BTreeMap<OffsetDateTime, Vec<PathBuf>> = BTreeMap::new();
+        let mut index = BTreeMap::new();
 
-        debug!(
+        info!(
             "Reading `{}` for scheduled posts",
             sched_dir.to_string_lossy()
         );
         for entry in std::fs::read_dir(sched_dir)? {
             let path = entry?.path();
             if path.is_file() {
-                if path.file_name().expect("file with no name") == "_index.md" {
+                let file_name = path.file_name().expect("file with no name");
+                if file_name == "_index.md" {
                     continue;
                 }
-                debug!("Reading {}", path.to_string_lossy());
-                let date = extract_date(&path, cfg)?;
-                if date <= now {
-                    need_publishing.push(path);
-                }
+                let date = extract_date(&path, cfg)
+                    .with_context(|| format!("error extracting date from {:?}", file_name))?;
+                let file_name = PathBuf::from(file_name);
+                scheduled
+                    .entry(date)
+                    .and_modify(|e| e.push(file_name.clone()))
+                    .or_insert_with(|| vec![file_name.clone()]);
+                index.insert(file_name, date);
             }
         }
-
-        debug!("need_publishing: {}", need_publishing.len());
-
-        for p in need_publishing {
-            info!("Publish `{:?}`", p);
-            publish_post(
-                &p.file_stem()
-                    .expect("should have a file name")
-                    .to_string_lossy(),
-                &cfg.schedule_dir,
-                cfg,
-            )?;
-        }
-
-        let scheduled: BTreeMap<OffsetDateTime, Vec<PathBuf>> = BTreeMap::new();
-        let index = BTreeMap::new();
 
         Ok(Self {
             scheduled: Mutex::new(scheduled),
@@ -81,9 +69,7 @@ pub async fn start_watching(
 ) -> Result<()> {
     let (tx, rx) = std::sync::mpsc::channel();
 
-    debug!("starting watcher");
-    // let mut watcher = RecommendedWatcher::new(tx, notify::Config::default())
-    //     .with_context(|| "Failed to create watcher")?;
+    info!("Starting watcher…");
     let mut debouncer = notify_debouncer_mini::new_debouncer(Duration::from_secs(2), None, tx)
         .with_context(|| "Failed to create watcher")?;
     let watcher = debouncer.watcher();
@@ -124,7 +110,7 @@ pub async fn start_watching(
         debouncing: cfg.debouncing,
     };
 
-    debug!("watcher started");
+    info!("Watcher started");
     let _ = tx_scheduler.send(SchedulerEvent::Changed);
     for res_evt in rx {
         match res_evt {
@@ -152,9 +138,9 @@ async fn process_evt(
         return;
     }
 
-    debug!("path: {:?}", &path);
+    debug!("process_evt path: {:?}", &path);
     if path.starts_with(&cfg_abs.schedule_dir) {
-        process_schedule_evt(path, s.clone(), &cfg);
+        process_schedule_evt(&path, s.clone(), &cfg);
         if let Err(e) = tx_scheduler.send(SchedulerEvent::Changed) {
             error!("Error sending ScheduleEvent: {:?}", e)
         }
@@ -172,71 +158,70 @@ async fn process_evt(
 }
 
 fn process_schedule_evt(path: &Path, s: Arc<SiteWatcher>, cfg: &SiteConfig) {
-    info!("Schedule directory changed");
     match path.exists() {
         true => match extract_date(path, cfg) {
             Ok(date) => {
-                let now = OffsetDateTime::now_utc();
-                if date <= now {
-                    info!("Post scheduled in the past, publish now");
-                    match publish_post(
-                        &path
-                            .file_stem()
-                            .expect("Should have filename")
-                            .to_string_lossy(),
-                        &cfg.schedule_dir,
-                        &cfg,
-                    ) {
-                        Ok(dest) => {
-                            info!("Scheduled post was due publishing: {}", dest)
-                        }
-                        Err(err) => error!("Error while publishing: {}", err),
-                    }
-                } else {
-                    info!("Post in the future, schedule");
-                    match (s.index.lock(), s.scheduled.lock()) {
-                        (Ok(mut index), Ok(mut scheduled)) => {
-                            // search if path already scheduled
-                            index
-                                .entry(path.to_path_buf())
-                                .and_modify(|old_date| {
-                                    // already scheduled, modify its date
-                                    if let Some(sched_at) = scheduled.get_mut(old_date) {
-                                        if sched_at.len() > 1 {
-                                            sched_at.retain(|p| p.as_path() != path);
-                                        }
+                info!("Process file modification: {:?}", path);
+                match (s.index.lock(), s.scheduled.lock()) {
+                    (Ok(mut index), Ok(mut scheduled)) => {
+                        // search if path already scheduled
+                        let file_name =
+                            PathBuf::from(path.file_name().expect("Sould have file name"));
+                        index
+                            .entry(file_name.clone())
+                            .and_modify(|old_date| {
+                                debug!("path already scheduled, modify it");
+                                // already scheduled, modify its date
+                                if let Some(sched_at) = scheduled.get_mut(old_date) {
+                                    if sched_at.len() > 1 {
+                                        sched_at.retain(|p| p.as_path() != path);
                                     }
-                                    scheduled
-                                        .entry(date)
-                                        .and_modify(|v| v.push(path.to_path_buf()))
-                                        .or_insert_with(|| vec![path.to_path_buf()]);
-                                    *old_date = date;
-                                })
-                                .or_insert_with(|| {
-                                    // not already scheduled, add it
-                                    scheduled
-                                        .entry(date)
-                                        .and_modify(|v| v.push(path.to_path_buf()))
-                                        .or_insert_with(|| vec![path.to_path_buf()]);
-                                    date
+                                }
+
+                                let mut remove_old_date = false;
+                                scheduled.entry(*old_date).and_modify(|v| {
+                                    let r = v.retain(|p| p != &file_name);
+                                    remove_old_date = v.is_empty();
+                                    r
                                 });
-                        }
-                        _ => {
-                            error!("Error getting lock on SiteWatcher")
-                        }
+
+                                if remove_old_date {
+                                    scheduled.remove(old_date);
+                                }
+
+                                scheduled
+                                    .entry(date)
+                                    .and_modify(|v| v.push(file_name.clone()))
+                                    .or_insert_with(|| vec![file_name.clone()]);
+                                *old_date = date;
+                            })
+                            .or_insert_with(|| {
+                                debug!("path not scheduled, add it");
+                                // not already scheduled, add it
+                                scheduled
+                                    .entry(date)
+                                    .and_modify(|v| v.push(file_name.clone()))
+                                    .or_insert_with(|| vec![file_name]);
+                                date
+                            });
+                    }
+                    _ => {
+                        error!("Error getting lock on SiteWatcher")
                     }
                 }
+                // }
             }
             Err(err) => error!("Error extracting date: {:?}", err),
         },
         false => {
-            info!("Unschedule {:?}", path);
+            let file_name = PathBuf::from(path.file_name().expect("Sould have file name"));
             match (s.index.lock(), s.scheduled.lock()) {
                 (Ok(mut index), Ok(mut scheduled)) => {
-                    if let Some(date) = index.remove(path) {
+                    if let Some(date) = index.remove(&file_name) {
+                        info!("Unschedule {}", path.to_string_lossy());
                         scheduled
                             .entry(date)
-                            .and_modify(|v| v.retain(|p| p.as_path() != path));
+                            .and_modify(|v| v.retain(|p| p != &file_name));
                     }
                 }
                 _ => {
