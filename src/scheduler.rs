@@ -6,7 +6,7 @@ use std::{
 use lazy_static::lazy_static;
 use time::OffsetDateTime;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
-use tracing::{debug, error, info, trace, warn};
+use tracing::{debug, error, info, warn};
 
 use crate::{
     config::SiteConfig,
