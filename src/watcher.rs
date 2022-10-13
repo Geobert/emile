@@ -70,8 +70,9 @@ pub async fn start_watching(
     let (tx, rx) = std::sync::mpsc::channel();
 
     info!("Starting watcher…");
-    let mut debouncer = notify_debouncer_mini::new_debouncer(Duration::from_secs(2), None, tx)
-        .with_context(|| "Failed to create watcher")?;
+    let mut debouncer =
+        notify_debouncer_mini::new_debouncer(Duration::from_secs(cfg.debouncing), None, tx)
+            .with_context(|| "Failed to create watcher")?;
     let watcher = debouncer.watcher();
 
     let current_dir = std::env::current_dir().with_context(|| "Failed to get current dir")?;
