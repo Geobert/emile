@@ -3,9 +3,10 @@ use std::path::PathBuf;
 
 use anyhow::{bail, Result};
 use slug::slugify;
-use time::{format_description::well_known::Rfc3339, OffsetDateTime};
+use time::OffsetDateTime;
 
 use crate::config::SiteConfig;
+use crate::format_date;
 use crate::post::modify_post;
 
 pub fn create_draft(title: &str, cfg: &SiteConfig) -> Result<()> {
@@ -37,7 +38,7 @@ pub fn create_draft(title: &str, cfg: &SiteConfig) -> Result<()> {
                 Ok(format!(
                     "+++\ntitle = \"{}\"\ndate = {}\ndraft = true\n",
                     title,
-                    date.format(&Rfc3339)?
+                    format_date(&date)?
                 ))
             } else {
                 Ok(format!("{}\n", line))
@@ -47,7 +48,7 @@ pub fn create_draft(title: &str, cfg: &SiteConfig) -> Result<()> {
         format!(
             "+++\ntitle = \"{}\"\ndate = {}\ndraft = true\n+++\n",
             title,
-            date.format(&Rfc3339)?
+            format_date(&date)?
         )
     };
     fs::write(&dest, new_content)?;

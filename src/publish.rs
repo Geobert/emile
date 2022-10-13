@@ -2,9 +2,10 @@ use std::fs::{self, DirEntry};
 use std::path::Path;
 
 use anyhow::{bail, Result};
-use time::{format_description::well_known::Rfc3339, OffsetDateTime};
+use time::OffsetDateTime;
 
 use crate::config::SiteConfig;
+use crate::format_date;
 use crate::post::modify_post;
 
 pub fn publish_post(slug: &str, src_dir: &Path, cfg: &SiteConfig) -> Result<String> {
@@ -18,7 +19,7 @@ pub fn publish_post(slug: &str, src_dir: &Path, cfg: &SiteConfig) -> Result<Stri
     let new_content = modify_post(&src, |cur_line: &str, in_frontmatter| {
         if in_frontmatter {
             if cur_line.starts_with("date = ") {
-                Ok(format!("date = {}\n", date.format(&Rfc3339)?))
+                Ok(format!("date = {}\n", format_date(&date)?))
             } else if !cur_line.starts_with("draft =") {
                 Ok(format!("{}\n", cur_line))
             } else {

@@ -13,7 +13,7 @@ mod scheduler;
 mod watcher;
 
 use opt::Opt;
-use time::macros::format_description;
+use time::{macros::format_description, OffsetDateTime};
 use tracing_subscriber::{
     fmt::time::UtcTime, prelude::__tracing_subscriber_SubscriberExt, util::SubscriberInitExt,
     EnvFilter,
@@ -93,4 +93,10 @@ fn zola_build() -> Result<()> {
             }
         },
     }
+}
+
+fn format_date(date: &OffsetDateTime) -> Result<String> {
+    Ok(date.format(&format_description!(
+        "[year]-[month]-[day]T[hour]:[minute]:[second][offset_hour sign:mandatory]:[offset_minute]"
+    ))?)
 }
