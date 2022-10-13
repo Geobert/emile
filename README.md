@@ -33,6 +33,8 @@ publish_dest = "content/"
 schedule_dir = "content/drafts/scheduled/"
 # Timezone relative to UTC you're writing the post in
 timezone = 0
+# number of seconds to wait before processing filesystem changes events
+debouncing = 2
 ```
 
 ## Usage
