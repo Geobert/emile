@@ -76,7 +76,7 @@ async fn main() -> Result<()> {
 }
 
 fn zola_build() -> Result<()> {
-    match dbg!(std::process::Command::new("zola").arg("build").output()) {
+    match std::process::Command::new("zola").arg("build").output() {
         Ok(output) => {
             if output.status.success() {
                 std::io::stdout().write_all(&output.stdout)?;
