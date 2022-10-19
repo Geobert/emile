@@ -75,13 +75,17 @@ async fn main() -> Result<()> {
 }
 
 fn zola_build() -> Result<()> {
-    match std::process::Command::new("zola").arg("build").output() {
+    match dbg!(std::process::Command::new("zola").arg("build").output()) {
         Ok(output) => {
             if output.status.success() {
                 std::io::stdout().write_all(&output.stdout)?;
                 Ok(std::io::stdout().flush()?)
             } else {
-                bail!("{}", String::from_utf8_lossy(&output.stdout));
+                bail!(
+                    "{}\n{}",
+                    String::from_utf8_lossy(&output.stdout),
+                    String::from_utf8_lossy(&output.stderr)
+                );
             }
         }
         Err(e) => match e.kind() {
