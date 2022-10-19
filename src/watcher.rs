@@ -134,13 +134,13 @@ async fn process_evt(
     tx_scheduler: &UnboundedSender<SchedulerEvent>,
 ) {
     let path = &evt.path;
-    // ignore directory changes
-    if path.is_dir() {
-        return;
-    }
 
-    debug!("process_evt path: {:?}", &path);
     if path.starts_with(&cfg_abs.schedule_dir) {
+        // ignore directory changes for schedule
+        if path.is_dir() {
+            return;
+        }
+        debug!("process_evt path: {:?}", &path);
         process_schedule_evt(&path, s.clone(), &cfg);
         if let Err(e) = tx_scheduler.send(SchedulerEvent::Changed) {
             error!("Error sending ScheduleEvent: {:?}", e)
@@ -148,6 +148,11 @@ async fn process_evt(
     } else if path.starts_with(&cfg_abs.drafts_creation_dir) {
         // nothing to do
     } else {
+        // ignore file changes so we can leverage debouncing on dir an reduce events to process
+        if !path.is_dir() {
+            return;
+        }
+        debug!("process_evt path: {:?}", &path);
         match zola_build() {
             Ok(_) => info!("Build success after filesystem event ({:?})", evt),
             Err(err) => error!(
