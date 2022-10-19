@@ -2,11 +2,9 @@ use std::path::PathBuf;
 
 use clap::Parser;
 
+/// A workflow companion for zola (https://getzola.org)
 #[derive(Debug, Parser)]
-#[clap(
-    name = "emile",
-    about = "A workflow companion for zola (https://getzola.org)"
-)]
+#[command(about, version)]
 pub enum Opt {
     /// Create a new post in drafts folder, with current date prefiled in the frontmatter.
     /// The date can be modified with the `drafts_year_shift` configuration key

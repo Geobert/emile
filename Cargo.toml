@@ -14,7 +14,7 @@ serde = "1.0.145"
 serde_derive = "1.0.145"
 slug = "0.1.4"
 notify = { version = "5.0.0", default-features = false }
-clap = { version = "3.2.22", features = ["derive"] }
+clap = { version = "4.0.17", features = ["derive"] }
 time = { version = "0.3.15", features = ["formatting", "parsing", "macros"] }
 tracing = "0.1.37"
 lazy_static = "1.4.0"
