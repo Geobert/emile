@@ -136,8 +136,13 @@ async fn process_evt(
     let path = &evt.path;
     debug!("evt receive for path: {:?}", &path);
     if path.starts_with(&cfg_abs.schedule_dir) {
-        // ignore directory changes for schedule
-        if path.is_dir() {
+        // ignore directory changes for schedule and rsync temp files
+        if path.is_dir()
+            || path
+                .file_name()
+                .map(|v| v.to_string_lossy().starts_with('.'))
+                .unwrap_or(false)
+        {
             return;
         }
 
@@ -148,10 +153,14 @@ async fn process_evt(
     } else if path.starts_with(&cfg_abs.drafts_creation_dir) {
         // nothing to do
     } else {
-        // ignore file changes so we can leverage debouncing on dir an reduce events to process
-        // if !path.is_dir() {
-        //     return;
-        // }
+        // ignore rsync temp files
+        if path
+            .file_name()
+            .map(|v| v.to_string_lossy().starts_with('.'))
+            .unwrap_or(false)
+        {
+            return;
+        }
 
         match zola_build() {
             Ok(_) => info!("Build success after filesystem event ({:?})", evt),
