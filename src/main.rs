@@ -52,6 +52,7 @@ async fn main() -> Result<()> {
         Opt::Watch { website } => {
             std::env::set_current_dir(website)?;
             let cfg = Arc::new(SiteConfigBuilder::get_config());
+            tracing::debug!("{:?}", cfg);
             let change_watcher = Arc::new(SiteWatcher::new(&cfg)?);
             let schedule_watcher = change_watcher.clone();
             let (tx_scheduler, rx_scheduler) = tokio::sync::mpsc::unbounded_channel();
