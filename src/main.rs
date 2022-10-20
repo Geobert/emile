@@ -12,35 +12,57 @@ mod publish;
 mod scheduler;
 mod watcher;
 
-use opt::Opt;
+use opt::{Commands, Opt};
 use time::{macros::format_description, OffsetDateTime};
-use tracing_subscriber::{
-    fmt::time::UtcTime, prelude::__tracing_subscriber_SubscriberExt, util::SubscriberInitExt,
-    EnvFilter,
-};
+use tracing::error;
+use tracing_subscriber::{fmt::time::UtcTime, prelude::*, util::SubscriberInitExt, EnvFilter};
 use watcher::SiteWatcher;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    tracing_subscriber::registry()
-        .with(
-            tracing_subscriber::fmt::layer()
-                .compact()
-                .with_timer(UtcTime::new(format_description!(
-                    "[year repr:last_two]-[month]-[day] [hour]:[minute]:[second]"
-                )))
-                .with_target(false),
-        )
-        .with(EnvFilter::try_from_env("EMILE_LOG").or_else(|_| EnvFilter::try_new("info"))?)
-        .init();
     let opt = Opt::parse();
+    // log setup
+    let _guard = if let Some(log_dir) = opt.log_dir {
+        if !log_dir.is_dir() {
+            error!("{} is not a valid directory", log_dir.to_string_lossy());
+            bail!("Invalid log dir");
+        }
+        let file_appender = tracing_appender::rolling::never(log_dir, "emile.log");
+        let (non_blocking, guard) = tracing_appender::non_blocking(file_appender);
+        tracing_subscriber::registry()
+            .with(
+                tracing_subscriber::fmt::layer()
+                    .compact()
+                    .with_timer(UtcTime::new(format_description!(
+                        "[year repr:last_two]-[month]-[day] [hour]:[minute]:[second]"
+                    )))
+                    .with_writer(non_blocking)
+                    .with_target(false),
+            )
+            .with(EnvFilter::try_from_env("EMILE_LOG").or_else(|_| EnvFilter::try_new("info"))?)
+            .init();
+        Some(guard)
+    } else {
+        tracing_subscriber::registry()
+            .with(
+                tracing_subscriber::fmt::layer()
+                    .compact()
+                    .with_timer(UtcTime::new(format_description!(
+                        "[year repr:last_two]-[month]-[day] [hour]:[minute]:[second]"
+                    )))
+                    .with_target(false),
+            )
+            .with(EnvFilter::try_from_env("EMILE_LOG").or_else(|_| EnvFilter::try_new("info"))?)
+            .init();
+        None
+    };
 
-    match opt {
-        Opt::New { title } => {
+    match opt.command {
+        Commands::New { title } => {
             let cfg = SiteConfigBuilder::get_config();
             new::create_draft(&title, &cfg)
         }
-        Opt::Publish { slug } => {
+        Commands::Publish { slug } => {
             let cfg = SiteConfigBuilder::get_config();
             let dest = publish::publish_post(&slug, &cfg.drafts_creation_dir, &cfg)?;
             println!(
@@ -49,7 +71,7 @@ async fn main() -> Result<()> {
             );
             Ok(())
         }
-        Opt::Watch { website } => {
+        Commands::Watch { website } => {
             std::env::set_current_dir(website)?;
             let cfg = Arc::new(SiteConfigBuilder::get_config());
             tracing::debug!("{:?}", cfg);
