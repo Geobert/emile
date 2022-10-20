@@ -101,7 +101,7 @@ checksum = "850878694b7933ca4c9569d30a34b55031b9b139ee1fc7b94a527c4ef960d690"
 
 [[package]]
 name = "emile"
-version = "0.3.3"
+version = "0.3.5"
 dependencies = [
  "anyhow",
  "clap",

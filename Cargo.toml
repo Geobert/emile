@@ -1,6 +1,6 @@
 [package]
 name = "emile"
-version = "0.3.3"
+version = "0.3.5"
 authors = ["Geobert Quach <geobert@protonmail.com>"]
 edition = "2021"
 
