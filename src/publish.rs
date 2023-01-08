@@ -21,12 +21,12 @@ pub fn publish_post(slug: &str, src_dir: &Path, cfg: &SiteConfig) -> Result<Stri
             if cur_line.starts_with("date = ") {
                 Ok(format!("date = {}\n", format_date(&date)?))
             } else if !cur_line.starts_with("draft =") {
-                Ok(format!("{}\n", cur_line))
+                Ok(format!("{cur_line}\n"))
             } else {
                 Ok("".to_string())
             }
         } else {
-            Ok(format!("{}\n", cur_line))
+            Ok(format!("{cur_line}\n"))
         }
     })?;
 
@@ -47,8 +47,8 @@ pub fn publish_post(slug: &str, src_dir: &Path, cfg: &SiteConfig) -> Result<Stri
 }
 
 fn does_same_title_exist(slug: &str, dir: &Path) -> Result<Option<DirEntry>> {
-    let end_of_filename = format!("{}.md", slug);
-    if let Some(res) = fs::read_dir(&dir)?.find(|f| {
+    let end_of_filename = format!("{slug}.md");
+    if let Some(res) = fs::read_dir(dir)?.find(|f| {
         let f = f.as_ref().expect("Should have a valid entry");
         if f.file_type().expect("Should have a FileType").is_file() {
             f.file_name().to_string_lossy().contains(&end_of_filename)

@@ -41,7 +41,7 @@ pub fn create_draft(title: &str, cfg: &SiteConfig) -> Result<()> {
                     format_date(&date)?
                 ))
             } else {
-                Ok(format!("{}\n", line))
+                Ok(format!("{line}\n"))
             }
         })?
     } else {

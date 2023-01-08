@@ -15,7 +15,7 @@ pub fn modify_post(
     path: &Path,
     mut operation: impl FnMut(&str, bool) -> Result<String>,
 ) -> Result<String> {
-    let file = File::open(&path)?;
+    let file = File::open(path)?;
     let reader = BufReader::new(&file);
     let mut new_content = String::new();
     let mut in_frontmatter = true;
@@ -57,7 +57,7 @@ pub fn extract_date(path: &Path, cfg: &SiteConfig) -> Result<OffsetDateTime> {
                 }
                 let date_str = date_split.get(1).unwrap().trim();
                 let date = if date_str.len() == 10 {
-                    Date::parse(&date_str, &format_description!("[year]-[month]-[day]"))?
+                    Date::parse(date_str, &format_description!("[year]-[month]-[day]"))?
                         .with_hms(0, 0, 0)?
                         .assume_offset(cfg.timezone)
                 } else {

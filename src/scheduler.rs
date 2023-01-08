@@ -37,15 +37,12 @@ impl Scheduled {
 
 impl Drop for Scheduled {
     fn drop(&mut self) {
-        match self.cancel_tx.take() {
-            Some(cancel_tx) => {
-                if !cancel_tx.is_closed() {
-                    if let Err(e) = cancel_tx.send(()) {
-                        error!("Error on cancelling schedule: {:?}", e)
-                    }
+        if let Some(cancel_tx) = self.cancel_tx.take() {
+            if !cancel_tx.is_closed() {
+                if let Err(e) = cancel_tx.send(()) {
+                    error!("Error on cancelling schedule: {:?}", e)
                 }
             }
-            None => (),
         }
     }
 }
@@ -97,7 +94,7 @@ async fn parse_scheduled(
         Ok(scheduled) => {
             let now = OffsetDateTime::now_utc();
             for (date, paths) in scheduled.iter() {
-                let date = (*date).clone();
+                let date = *date;
                 if date <= now {
                     info!("Post(s) scheduled in the past, publish now");
                     date_to_remove.push(date);
@@ -110,7 +107,7 @@ async fn parse_scheduled(
                                 .expect("Should have filename")
                                 .to_string_lossy(),
                             &cfg.schedule_dir,
-                            &cfg,
+                            cfg,
                         ) {
                             Ok(dest) => {
                                 info!("Scheduled post published: {}", dest)
@@ -129,7 +126,7 @@ async fn parse_scheduled(
                         date
                     );
                     tokio::spawn(async move {
-                        if let Err(_) = tokio::time::timeout(duration, rx).await {
+                        if tokio::time::timeout(duration, rx).await.is_err() {
                             debug!("Schedule due for date: {}", date);
                             let _ = tx_scheduler.send(SchedulerEvent::Scheduled(date));
                         }
@@ -145,7 +142,7 @@ async fn parse_scheduled(
         }
         Err(err) => error!("Error getting lock on SiteWatcher: {:?}", err),
     }
-    return None;
+    None
 }
 
 pub async fn start_scheduler(

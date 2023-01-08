@@ -45,7 +45,7 @@ impl SiteWatcher {
                     continue;
                 }
                 let date = extract_date(&path, cfg)
-                    .with_context(|| format!("error extracting date from {:?}", file_name))?;
+                    .with_context(|| format!("error extracting date from {file_name:?}"))?;
                 let file_name = PathBuf::from(file_name);
                 scheduled
                     .entry(date)
@@ -80,23 +80,23 @@ pub async fn start_watching(
     let dir = current_dir.join("content");
     watcher
         .watch(&dir, RecursiveMode::Recursive)
-        .with_context(|| format!("Failed to start watching on `{:?}`", dir))?;
+        .with_context(|| format!("Failed to start watching on `{dir:?}`"))?;
     let dir = current_dir.join("sass");
     watcher
         .watch(&dir, RecursiveMode::Recursive)
-        .with_context(|| format!("Failed to start watching on `{:?}`", dir))?;
+        .with_context(|| format!("Failed to start watching on `{dir:?}`"))?;
     let dir = current_dir.join("static");
     watcher
         .watch(&dir, RecursiveMode::Recursive)
-        .with_context(|| format!("Failed to start watching on `{:?}`", dir))?;
+        .with_context(|| format!("Failed to start watching on `{dir:?}`"))?;
     let dir = current_dir.join("templates");
     watcher
         .watch(&dir, RecursiveMode::Recursive)
-        .with_context(|| format!("Failed to start watching on `{:?}`", dir))?;
+        .with_context(|| format!("Failed to start watching on `{dir:?}`"))?;
     let dir = current_dir.join("themes");
     watcher
         .watch(&dir, RecursiveMode::Recursive)
-        .with_context(|| format!("Failed to start watching on `{:?}`", dir))?;
+        .with_context(|| format!("Failed to start watching on `{dir:?}`"))?;
 
     let schedule_abs_dir = current_dir.join(&cfg.schedule_dir);
     let draft_abs_creation_dir = current_dir.join(&cfg.drafts_creation_dir);
@@ -146,7 +146,7 @@ async fn process_evt(
             return;
         }
 
-        process_schedule_evt(&path, s.clone(), &cfg);
+        process_schedule_evt(path, s, cfg);
         if let Err(e) = tx_scheduler.send(SchedulerEvent::Changed) {
             error!("Error sending ScheduleEvent: {:?}", e)
         }
@@ -195,9 +195,8 @@ fn process_schedule_evt(path: &Path, s: Arc<SiteWatcher>, cfg: &SiteConfig) {
 
                                 let mut remove_old_date = false;
                                 scheduled.entry(*old_date).and_modify(|v| {
-                                    let r = v.retain(|p| p != &file_name);
+                                    v.retain(|p| p != &file_name);
                                     remove_old_date = v.is_empty();
-                                    r
                                 });
 
                                 if remove_old_date {

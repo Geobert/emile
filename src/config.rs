@@ -49,10 +49,7 @@ impl SiteConfigBuilder {
     pub fn get_config() -> SiteConfig {
         let cfg = SiteConfigBuilder::from_file("./emile.toml");
         if let Err(ref err) = cfg {
-            eprintln!(
-                "Warning: failed to load `emile.toml`, fallback to default values ({})",
-                err
-            );
+            eprintln!("Warning: failed to load `emile.toml`, fallback to default values ({err})");
         }
         cfg.unwrap_or_default()
     }
@@ -84,7 +81,7 @@ impl SiteConfigBuilder {
                 .timezone
                 .map(|t| {
                     UtcOffset::from_hms(t, 0, 0)
-                        .expect(&format!("Error constructing UtcOffset with {}", t))
+                        .unwrap_or_else(|_| panic!("Error constructing UtcOffset with {t}"))
                 })
                 .unwrap_or(UtcOffset::UTC),
             debouncing: cfg_builder.debouncing.unwrap_or(2),
