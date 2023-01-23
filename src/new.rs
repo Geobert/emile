@@ -7,7 +7,7 @@ use time::OffsetDateTime;
 
 use crate::config::SiteConfig;
 use crate::format_date;
-use crate::post::modify_post;
+use crate::post::modify_front;
 
 pub fn create_draft(title: &str, cfg: &SiteConfig) -> Result<()> {
     if !cfg.drafts_creation_dir.exists() {
@@ -33,11 +33,10 @@ pub fn create_draft(title: &str, cfg: &SiteConfig) -> Result<()> {
         bail!("`{}` is not a file.", cfg.draft_template);
     }
     let new_content = if src.exists() {
-        modify_post(&src, |line: &str, in_frontmatter| {
-            if in_frontmatter && line.starts_with("+++") {
+        modify_front(&src, |line: &str| {
+            if line.starts_with("+++") {
                 Ok(format!(
-                    "+++\ntitle = \"{}\"\ndate = {}\ndraft = true\n",
-                    title,
+                    "+++\ntitle = \"{title}\"\ndate = {}\ndraft = true\n",
                     format_date(&date)?
                 ))
             } else {
@@ -46,8 +45,7 @@ pub fn create_draft(title: &str, cfg: &SiteConfig) -> Result<()> {
         })?
     } else {
         format!(
-            "+++\ntitle = \"{}\"\ndate = {}\ndraft = true\n+++\n",
-            title,
+            "+++\ntitle = \"{title}\"\ndate = {}\ndraft = true\n+++\n",
             format_date(&date)?
         )
     };

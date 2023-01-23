@@ -11,9 +11,9 @@ use time::{
 
 use crate::config::SiteConfig;
 
-pub fn modify_post(
+pub fn modify_front(
     path: &Path,
-    mut operation: impl FnMut(&str, bool) -> Result<String>,
+    mut operation: impl FnMut(&str) -> Result<String>,
 ) -> Result<String> {
     let file = File::open(path)?;
     let reader = BufReader::new(&file);
@@ -27,14 +27,21 @@ pub fn modify_post(
                 nb_sep += 1;
                 if nb_sep >= 2 {
                     in_frontmatter = false;
+                    new_content.push_str(&line);
+                } else {
+                    new_content.push_str(&operation(&line)?);
                 }
             }
-            new_content.push_str(&operation(&line, in_frontmatter)?);
         } else {
-            new_content.push_str(&operation(&line, in_frontmatter)?);
+            new_content.push_str(&line);
         }
     }
-    Ok(new_content)
+
+    if in_frontmatter {
+        bail!("Missing `+++` delimiter")
+    } else {
+        Ok(new_content)
+    }
 }
 
 pub fn extract_date(path: &Path, cfg: &SiteConfig) -> Result<OffsetDateTime> {

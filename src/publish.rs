@@ -6,7 +6,7 @@ use time::OffsetDateTime;
 
 use crate::config::SiteConfig;
 use crate::format_date;
-use crate::post::modify_post;
+use crate::post::modify_front;
 
 pub fn publish_post(slug: &str, src_dir: &Path, cfg: &SiteConfig) -> Result<String> {
     let filename = format!("{}.md", &slug);
@@ -16,17 +16,13 @@ pub fn publish_post(slug: &str, src_dir: &Path, cfg: &SiteConfig) -> Result<Stri
     }
 
     let date = OffsetDateTime::now_utc().to_offset(cfg.timezone);
-    let new_content = modify_post(&src, |cur_line: &str, in_frontmatter| {
-        if in_frontmatter {
-            if cur_line.starts_with("date = ") {
-                Ok(format!("date = {}\n", format_date(&date)?))
-            } else if !cur_line.starts_with("draft =") {
-                Ok(format!("{cur_line}\n"))
-            } else {
-                Ok("".to_string())
-            }
-        } else {
+    let new_content = modify_front(&src, |cur_line: &str| {
+        if cur_line.starts_with("date = ") {
+            Ok(format!("date = {}\n", format_date(&date)?))
+        } else if !cur_line.starts_with("draft =") {
             Ok(format!("{cur_line}\n"))
+        } else {
+            Ok("".to_string())
         }
     })?;
 
