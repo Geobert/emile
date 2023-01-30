@@ -64,8 +64,9 @@ async fn main() -> Result<()> {
         }
         Commands::Publish { slug } => {
             let cfg = SiteConfigBuilder::get_config();
-            let dest = publish::publish_post(&slug, &cfg.drafts_creation_dir, &cfg)?;
-            println!("Success: post `{dest}` published. Call `zola build` to rebuild the site.");
+            let dest = publish::publish_post(&slug, &cfg.drafts_creation_dir, &cfg).await?;
+            zola_build()?;
+            println!("Success: post `{dest}` published.");
             Ok(())
         }
         Commands::Watch { website } => {

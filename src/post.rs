@@ -25,12 +25,14 @@ pub fn modify_front(
         if in_frontmatter {
             if line.starts_with("+++") {
                 nb_sep += 1;
-                if nb_sep >= 2 {
-                    in_frontmatter = false;
-                    new_content.push_str(&line);
-                } else {
-                    new_content.push_str(&operation(&line)?);
-                }
+            }
+
+            if nb_sep >= 2 {
+                in_frontmatter = false;
+                new_content.push_str(&line);
+                new_content.push('\n');
+            } else {
+                new_content.push_str(&operation(&line)?);
             }
         } else {
             new_content.push_str(&line);

@@ -109,6 +109,7 @@ pub async fn start_watching(
         schedule_dir: schedule_abs_dir,
         timezone: cfg.timezone,
         debouncing: cfg.debouncing,
+        mastodon: cfg.mastodon.clone(),
     };
 
     info!("Watcher started");

@@ -1,6 +1,6 @@
 [package]
 name = "emile"
-version = "0.3.7"
+version = "0.4.0"
 authors = ["Geobert Quach <geobert@proton.me>"]
 edition = "2021"
 
@@ -9,17 +9,20 @@ azure-devops = { project = "geobert/emile", pipeline = "emile-CI", build = "2" }
 
 [dependencies]
 anyhow = "1.0.68"
-toml = "0.5.11"
+toml = "0.7"
 serde = "1.0.152"
 serde_derive = "1.0.152"
 slug = "0.1.4"
-notify = { version = "5.0.0", default-features = false }
-clap = { version = "4.1.2", features = ["derive"] }
+notify = { version = "5.1.0", default-features = false }
+clap = { version = "4.1.4", features = ["derive"] }
 time = { version = "0.3.17", features = ["formatting", "parsing", "macros"] }
 lazy_static = "1.4.0"
-tokio = { version = "1.24.2", features = ["sync", "macros", "rt-multi-thread", "time"] }
+tokio = { version = "1.25.0", features = ["sync", "macros", "rt-multi-thread", "time"] }
 notify-debouncer-mini = { version = "0.2.1", default-features = false }
 tracing = "0.1.37"
 tracing-appender = "0.2.2"
 tracing-subscriber = { version = "0.3.16", default-features = false, features = ["std", "env-filter", "fmt", "smallvec", "parking_lot", "registry", "time"] }
+once_cell = "1.17.0"
+reqwest = { version = "0.11.14", features = ["json"] }
+sha2 = "0.10.6"
 

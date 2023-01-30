@@ -1,5 +1,5 @@
 use std::fs::File;
-use std::io::prelude::*;
+use std::io::{prelude::*, BufReader};
 use std::path::{Path, PathBuf};
 
 use anyhow::Result;
@@ -22,11 +22,45 @@ pub struct SiteConfig {
     pub timezone: UtcOffset,
     // how long (in seconds) to wait for end of filesystem event
     pub debouncing: u64,
+    // Mastodon configuration
+    pub mastodon: Option<MastodonCfg>,
 }
 
-impl SiteConfig {}
+#[derive(Debug, Clone)]
+pub struct MastodonCfg {
+    // host of the Mastodon server to post to
+    pub instance: String,
+    // template to use for posting on mastodon
+    pub social_template: String,
+    // default language
+    pub default_lang: String,
+    // base url
+    pub base_url: String,
+    // tag <-> language
+    pub tag_lang: Option<Vec<TagLang>>,
+    // tags to not put in the toot
+    pub filtered_tag: Vec<String>,
+}
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
+pub struct TagLang {
+    pub tag: String,
+    pub lang: String,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct MastodonCfgBuilder {
+    // host of the Mastodon server to post to
+    pub instance: String,
+    // template to use for posting on mastodon
+    pub social_template: Option<String>,
+    // tag <-> language
+    pub tag_lang: Option<Vec<TagLang>>,
+    // tags to not put in the toot
+    pub filtered_tag: Vec<String>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
 pub struct SiteConfigBuilder {
     // drafts created with `new` command will end here. Path relative to root of the blog.
     pub drafts_creation_dir: Option<PathBuf>,
@@ -42,6 +76,8 @@ pub struct SiteConfigBuilder {
     pub timezone: Option<i8>,
     // how long (in seconds) to wait for end of filesystem event (10s by default)
     pub debouncing: Option<u64>,
+    // mastodon instance host
+    pub mastodon: Option<MastodonCfgBuilder>,
 }
 
 impl SiteConfigBuilder {
@@ -61,8 +97,57 @@ impl SiteConfigBuilder {
         SiteConfigBuilder::parse(&content)
     }
 
+    // Get (default language, base url) from Zola’s config file
+    fn get_config_from_zola() -> (String, String) {
+        let file = File::open("./config.toml");
+        match file {
+            Err(ref err) => {
+                eprintln!(
+                    "Warning: failed to load `config.toml`, fallback to default values ({err})"
+                );
+                ("en".to_string(), "localhost".to_string())
+            }
+            Ok(file) => {
+                let reader = BufReader::new(&file);
+
+                let mut result_lang = "en".to_string();
+                let mut result_base = "localhost".to_string();
+
+                for line in reader.lines() {
+                    let line = line.expect("Should have text");
+                    let line = line.trim();
+                    if line.starts_with("default_language") {
+                        let v: Vec<&str> = line.split('=').collect();
+                        if let Some(lang) = v.get(1) {
+                            result_lang = lang.replace('"', "").trim().to_string();
+                        }
+                    } else if line.starts_with("base_url") {
+                        let v: Vec<&str> = line.split('=').collect();
+                        if let Some(base) = v.get(1) {
+                            result_base = base.replace('"', "").trim().to_string();
+                        }
+                    }
+                }
+
+                (result_lang, result_base)
+            }
+        }
+    }
+
     fn parse(s: &str) -> Result<SiteConfig> {
         let cfg_builder: SiteConfigBuilder = toml::from_str(s)?;
+        let (default_lang, base_url) = SiteConfigBuilder::get_config_from_zola();
+        let mastodon = cfg_builder.mastodon.map(|cfg| MastodonCfg {
+            instance: cfg.instance,
+            social_template: cfg
+                .social_template
+                .unwrap_or_else(|| "mastodon.txt".to_string()),
+            default_lang,
+            base_url,
+            tag_lang: cfg.tag_lang,
+            filtered_tag: cfg.filtered_tag,
+        });
+
         let config = SiteConfig {
             drafts_creation_dir: cfg_builder
                 .drafts_creation_dir
@@ -85,6 +170,7 @@ impl SiteConfigBuilder {
                 })
                 .unwrap_or(UtcOffset::UTC),
             debouncing: cfg_builder.debouncing.unwrap_or(2),
+            mastodon,
         };
 
         Ok(config)
@@ -101,6 +187,7 @@ impl Default for SiteConfig {
             schedule_dir: PathBuf::from("content/drafts/schedule"),
             timezone: UtcOffset::UTC,
             debouncing: 2,
+            mastodon: None,
         }
     }
 }

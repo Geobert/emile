@@ -90,6 +90,9 @@ async fn parse_scheduled(
 ) -> Option<ParseResult> {
     let mut date_to_remove = Vec::new();
     let mut path_to_remove = Vec::new();
+    let mut path_to_publish = Vec::new();
+    let mut res = None;
+
     match watcher.scheduled.lock() {
         Ok(scheduled) => {
             let now = OffsetDateTime::now_utc();
@@ -100,20 +103,12 @@ async fn parse_scheduled(
                     date_to_remove.push(date);
                     for path in paths {
                         path_to_remove.push((*path).clone());
-
-                        match publish_post(
-                            &path
-                                .file_stem()
+                        path_to_publish.push(
+                            path.file_stem()
                                 .expect("Should have filename")
-                                .to_string_lossy(),
-                            &cfg.schedule_dir,
-                            cfg,
-                        ) {
-                            Ok(dest) => {
-                                info!("Scheduled post published: {}", dest)
-                            }
-                            Err(err) => error!("Error while publishing: {}", err),
-                        }
+                                .to_string_lossy()
+                                .to_string(),
+                        );
                     }
                 } else {
                     let (tx, rx) = tokio::sync::oneshot::channel();
@@ -132,17 +127,27 @@ async fn parse_scheduled(
                         }
                     });
 
-                    return Some(ParseResult {
+                    res = Some(ParseResult {
                         tx,
                         date_to_remove,
                         path_to_remove,
                     });
+                    break;
                 }
             }
         }
         Err(err) => error!("Error getting lock on SiteWatcher: {:?}", err),
     }
-    None
+
+    for path in path_to_publish {
+        match publish_post(&path, &cfg.schedule_dir, cfg).await {
+            Ok(dest) => {
+                info!("Scheduled post published: {}", dest)
+            }
+            Err(err) => error!("Error while publishing: {}", err),
+        }
+    }
+    res
 }
 
 pub async fn start_scheduler(
@@ -173,24 +178,18 @@ pub async fn start_scheduler(
                     Err(e) => error!("Failed to get lock on SCHEDULED: {:?}", e),
                 }
                 {
+                    let mut paths_to_publish = Vec::new();
                     match (watcher.scheduled.lock(), watcher.index.lock()) {
                         (Ok(mut scheduled), Ok(mut index)) => match scheduled.remove(&date) {
                             Some(paths) => {
                                 for path in paths {
                                     index.remove(&path);
-                                    match publish_post(
-                                        &path
-                                            .file_stem()
+                                    paths_to_publish.push(
+                                        path.file_stem()
                                             .expect("Should have filename")
-                                            .to_string_lossy(),
-                                        &cfg.schedule_dir,
-                                        &cfg,
-                                    ) {
-                                        Ok(dest) => {
-                                            info!("Scheduled post published: {}", dest);
-                                        }
-                                        Err(err) => error!("Error while publishing: {}", err),
-                                    }
+                                            .to_string_lossy()
+                                            .to_string(),
+                                    );
                                 }
                             }
                             None => {
@@ -199,6 +198,15 @@ pub async fn start_scheduler(
                         },
                         _ => {
                             error!("Error getting lock on SiteWatcher")
+                        }
+                    }
+
+                    for path in paths_to_publish {
+                        match publish_post(&path, &cfg.schedule_dir, &cfg).await {
+                            Ok(dest) => {
+                                info!("Scheduled post published: {}", dest);
+                            }
+                            Err(err) => error!("Error while publishing: {}", err),
                         }
                     }
                 }

@@ -35,6 +35,17 @@ schedule_dir = "content/drafts/scheduled/"
 timezone = 0
 # number of seconds to wait before processing filesystem changes events
 debouncing = 2
+
+# Section to activate posting a toot on mastodon on publish
+[mastodon]
+# host of the mastodon instance of your account
+instance = "mastodon.social"
+# file in /template to use as the toot’s template
+social_template = "mastodon.txt"
+# if a tag match, use the associated lang
+tag_lang = [{ tag = "english", lang = "en" }]
+# tag in the list will not be in the toot
+filtered_tag = ["english", "mon avis"]
 ```
 
 ## Usage
@@ -67,3 +78,30 @@ date in the frontmatter of the post.
 
 On modification in `/content/posts` or anywhere not `draft_creation_dir` it will rebuild
 the blog.
+
+## Mastodon support
+
+When a post is published, it is possible to publish a toot on Mastodon.
+
+You need to set the environment variable `EMILE_MASTODON_TOKEN` with the access token from 
+the development section and 
+
+Add the `[mastodon]` section with needed info:
+
+- `instance`: The host of the instance where the account used to post is
+- `social_template`: The file in `/template` to use for the toot’s template. Default: 
+  `mastodon.txt`. In case of multiple languages, a suffix with the iso code can be added, 
+  ex: `mastodon.en.txt`
+- `tag_lang`: if a tag match, the associated lang will be put as the lang of the toot and 
+  the template with the lang suffix will be used
+- `filtered_tag`: the matching tags will not be included in the toot.
+
+### Toot template
+
+The template system is very rude and is a simple text replace supporting:
+- `{title}`: the title of the post
+- `{link}`: the link to the post
+- `{tags}`: the tags of the post, filtered tags are not included, and if `#rust` is found, 
+  `#RustLang` is added
+
+
