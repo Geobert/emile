@@ -6,7 +6,7 @@ use anyhow::{anyhow, bail, Result};
 use once_cell::sync::Lazy;
 use serde_derive::{Deserialize, Serialize};
 use time::OffsetDateTime;
-use tracing::error;
+use tracing::{error, info};
 
 use crate::config::{MastodonCfg, SiteConfig};
 use crate::format_date;
@@ -53,7 +53,10 @@ pub async fn publish_post(slug: &str, src_dir: &Path, cfg: &SiteConfig) -> Resul
     fs::remove_file(&src)?;
 
     if cfg.mastodon.is_some() {
+        info!("Some mastodon config, push to social");
         push_to_social(cfg, &new_content, &dest).await?;
+    } else {
+        info!("No mastodon config");
     }
 
     Ok(dest.to_string_lossy().to_string())
@@ -234,6 +237,8 @@ async fn push_to_social(config: &SiteConfig, content: &str, dest: &Path) -> Resu
             .json(&toot)
             .send()
             .await?;
+    } else {
+        error!("No EMILE_MASTODON_TOKEN env var");
     }
     Ok(())
 }
