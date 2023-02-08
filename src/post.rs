@@ -36,6 +36,7 @@ pub fn modify_front(
             }
         } else {
             new_content.push_str(&line);
+            new_content.push('\n');
         }
     }
 

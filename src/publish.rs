@@ -201,7 +201,7 @@ async fn push_to_social(config: &SiteConfig, content: &str, dest: &Path) -> Resu
         let link = format!(
             "{}/posts/{}",
             mastodon.base_url,
-            dest.file_name()
+            dest.file_stem()
                 .expect("Should have file_name by now")
                 .to_string_lossy()
         );

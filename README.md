@@ -84,9 +84,7 @@ the blog.
 When a post is published, it is possible to publish a toot on Mastodon.
 
 You need to set the environment variable `EMILE_MASTODON_TOKEN` with the access token from 
-the development section and 
-
-Add the `[mastodon]` section with needed info:
+the development section and add the `[mastodon]` section with needed info:
 
 - `instance`: The host of the instance where the account used to post is
 - `social_template`: The file in `/template` to use for the toot’s template. Default: 
@@ -104,4 +102,4 @@ The template system is very rude and is a simple text replace supporting:
 - `{tags}`: the tags of the post, filtered tags are not included, and if `#rust` is found, 
   `#RustLang` is added
 
-
+You need at least one template file in the `/template` directory.

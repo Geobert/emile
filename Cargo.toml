@@ -1,6 +1,6 @@
 [package]
 name = "emile"
-version = "0.4.0"
+version = "0.4.1"
 authors = ["Geobert Quach <geobert@proton.me>"]
 edition = "2021"
 
@@ -8,7 +8,7 @@ edition = "2021"
 azure-devops = { project = "geobert/emile", pipeline = "emile-CI", build = "2" }
 
 [dependencies]
-anyhow = "1.0.68"
+anyhow = "1.0.69"
 toml = "0.7"
 serde = "1.0.152"
 serde_derive = "1.0.152"
