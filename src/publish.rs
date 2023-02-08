@@ -137,7 +137,14 @@ fn extract_title_lang_tags(
                     .iter()
                     .filter_map(|tag| {
                         if !config.filtered_tag.contains(tag) {
-                            Some(slug::slugify(tag))
+                            let tag = slug::slugify(tag);
+                            let parts = tag.split('-');
+                            let tag = parts.fold(String::new(), |mut acc, part| {
+                                acc.push_str(&part[0..1].to_uppercase());
+                                acc.push_str(&part[1..]);
+                                acc
+                            });
+                            Some(tag)
                         } else {
                             None
                         }
@@ -210,7 +217,7 @@ async fn push_to_social(config: &SiteConfig, content: &str, dest: &Path) -> Resu
         // fill tags
         let tags_list = tags.iter().fold(String::new(), |mut res, tag| {
             res.push('#');
-            res.push_str(&tag.replace('-', ""));
+            res.push_str(tag);
             res.push(' ');
             if tag == "rust" {
                 // both tags are used for Rust programming language
