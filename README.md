@@ -71,7 +71,7 @@ emile publish my-new-blog-post
 
 ### watch
 
-This command will put `emile` in watcher mode, waiting for modifications in the the blog.
+This command will put `emile` in watcher mode, waiting for modifications in the blog.
 
 On modification in the `schedule_dir`, it will schedule the post in it according to the
 date in the frontmatter of the post.
