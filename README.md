@@ -2,6 +2,13 @@
 
 A workflow companion for [Zola](https://getzola.org).
 
+## Features
+* rebuild site on modification
+* post scheduling
+* toot on Mastodon when a scheduled post is live
+* `new` command to create a new post using a predefined template
+* `publish` command to change state of a draft to publish
+
 ## Build
 
 `cargo build --release`
