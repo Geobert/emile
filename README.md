@@ -2,6 +2,13 @@
 
 A workflow companion for [Zola](https://getzola.org).
 
+## Features
+* rebuild site on modification
+* post scheduling
+* toot on Mastodon when a scheduled post is live
+* `new` command to create a new post using a predefined template
+* `publish` command to change state of a draft to publish
+
 ## Build
 
 `cargo build --release`
@@ -71,7 +78,7 @@ emile publish my-new-blog-post
 
 ### watch
 
-This command will put `emile` in watcher mode, waiting for modifications in the the blog.
+This command will put `emile` in watcher mode, waiting for modifications in the blog.
 
 On modification in the `schedule_dir`, it will schedule the post in it according to the
 date in the frontmatter of the post.
