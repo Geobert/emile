@@ -71,7 +71,7 @@ pub async fn start_watching(
 
     info!("Starting watcher…");
     let mut debouncer =
-        notify_debouncer_mini::new_debouncer(Duration::from_secs(cfg.debouncing), None, tx)
+        notify_debouncer_mini::new_debouncer(Duration::from_secs(cfg.debouncing), tx)
             .with_context(|| "Failed to create watcher")?;
     let watcher = debouncer.watcher();
 
