@@ -1,8 +1,9 @@
+use std::fmt::Display;
 use std::fs::File;
 use std::io::{prelude::*, BufReader};
 use std::path::{Path, PathBuf};
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 use serde_derive::Deserialize;
 use time::UtcOffset;
 
@@ -22,16 +23,32 @@ pub struct SiteConfig {
     pub timezone: UtcOffset,
     // how long (in seconds) to wait for end of filesystem event
     pub debouncing: u64,
-    // Mastodon configuration
-    pub mastodon: Option<MastodonCfg>,
+    // social media configuration
+    pub social: Option<SocialCfg>,
 }
 
-#[derive(Debug, Clone)]
-pub struct MastodonCfg {
-    // host of the Mastodon server to post to
-    pub instance: String,
-    // template to use for posting on mastodon
-    pub social_template: String,
+#[non_exhaustive]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Deserialize)]
+pub enum SocialApi {
+    #[serde(alias = "mastodon")]
+    Mastodon,
+    #[serde(alias = "bluesky")]
+    Bluesky,
+}
+
+impl Display for SocialApi {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SocialApi::Mastodon => write!(f, "Mastodon"),
+            SocialApi::Bluesky => write!(f, "Bluesky"),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct SocialCfg {
+    // path to the template to use for posting on mastodon
+    pub social_template: PathBuf,
     // default language
     pub default_lang: String,
     // base url
@@ -40,6 +57,24 @@ pub struct MastodonCfg {
     pub tag_lang: Option<Vec<TagLang>>,
     // tags to not put in the toot
     pub filtered_tag: Vec<String>,
+    // path to the template for the link to the social post
+    pub link_template: PathBuf,
+    // tag to replace with expanded link_temolate
+    pub link_tag: String,
+    // social server to post to
+    pub instances: Vec<SocialInstance>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct SocialInstance {
+    // host of the server to post to
+    pub server: String,
+    // which social network API to use
+    pub api: SocialApi,
+    // env var to read access token from
+    pub token_var: String,
+    // env var to read user’s id from
+    pub handle_var: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -49,15 +84,19 @@ pub struct TagLang {
 }
 
 #[derive(Debug, Deserialize, Clone)]
-pub struct MastodonCfgBuilder {
-    // host of the Mastodon server to post to
-    pub instance: String,
+pub struct SocialCfgBuilder {
     // template to use for posting on mastodon
-    pub social_template: Option<String>,
+    pub social_template: Option<PathBuf>,
     // tag <-> language
     pub tag_lang: Option<Vec<TagLang>>,
     // tags to not put in the toot
     pub filtered_tag: Vec<String>,
+    // path to the template for the link to the social post
+    pub link_template: Option<PathBuf>,
+    // tag to replace with expanded link_temolate
+    pub link_tag: Option<String>,
+    // social server to post to
+    pub instances: Vec<SocialInstance>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -76,8 +115,8 @@ pub struct SiteConfigBuilder {
     pub timezone: Option<i8>,
     // how long (in seconds) to wait for end of filesystem event (10s by default)
     pub debouncing: Option<u64>,
-    // mastodon instance host
-    pub mastodon: Option<MastodonCfgBuilder>,
+    // social media configuration
+    pub social: Option<SocialCfgBuilder>,
 }
 
 impl SiteConfigBuilder {
@@ -137,16 +176,29 @@ impl SiteConfigBuilder {
     fn parse(s: &str) -> Result<SiteConfig> {
         let cfg_builder: SiteConfigBuilder = toml::from_str(s)?;
         let (default_lang, base_url) = SiteConfigBuilder::get_config_from_zola();
-        let mastodon = cfg_builder.mastodon.map(|cfg| MastodonCfg {
-            instance: cfg.instance,
-            social_template: cfg
+
+        let social = cfg_builder.social.map(|cfg_builder| SocialCfg {
+            social_template: cfg_builder
                 .social_template
-                .unwrap_or_else(|| "mastodon.txt".to_string()),
+                .unwrap_or_else(|| PathBuf::from("social.txt")),
             default_lang,
             base_url,
-            tag_lang: cfg.tag_lang,
-            filtered_tag: cfg.filtered_tag,
+            tag_lang: cfg_builder.tag_lang,
+            filtered_tag: cfg_builder.filtered_tag,
+            link_template: cfg_builder
+                .link_template
+                .unwrap_or_else(|| PathBuf::from("social_link.txt")),
+            link_tag: cfg_builder
+                .link_tag
+                .unwrap_or("{% emile_social %}".to_owned()),
+            instances: cfg_builder.instances,
         });
+
+        if let Some(social) = &social {
+            if social.instances.is_empty() {
+                bail!("No social servers defined.")
+            }
+        }
 
         let config = SiteConfig {
             drafts_creation_dir: cfg_builder
@@ -170,7 +222,7 @@ impl SiteConfigBuilder {
                 })
                 .unwrap_or(UtcOffset::UTC),
             debouncing: cfg_builder.debouncing.unwrap_or(2),
-            mastodon,
+            social,
         };
 
         Ok(config)
@@ -187,7 +239,7 @@ impl Default for SiteConfig {
             schedule_dir: PathBuf::from("content/drafts/schedule"),
             timezone: UtcOffset::UTC,
             debouncing: 2,
-            mastodon: None,
+            social: None,
         }
     }
 }

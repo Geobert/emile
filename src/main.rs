@@ -10,6 +10,7 @@ mod opt;
 mod post;
 mod publish;
 mod scheduler;
+mod social;
 mod watcher;
 
 use opt::{Commands, Opt};
@@ -123,5 +124,11 @@ fn zola_build() -> Result<()> {
 fn format_date(date: &OffsetDateTime) -> Result<String> {
     Ok(date.format(&format_description!(
         "[year]-[month]-[day]T[hour]:[minute]:[second][offset_hour sign:mandatory]:[offset_minute]"
+    ))?)
+}
+
+fn format_utc_date(date: &OffsetDateTime) -> Result<String> {
+    Ok(date.format(&format_description!(
+        "[year]-[month]-[day]T[hour]:[minute]:[second]Z"
     ))?)
 }
