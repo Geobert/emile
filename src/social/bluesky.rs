@@ -1,7 +1,7 @@
 use anyhow::{bail, Ok, Result};
+use chrono::Utc;
 use reqwest::{StatusCode, Url};
 use serde_derive::{Deserialize, Serialize};
-use time::OffsetDateTime;
 use tracing::{debug, info};
 
 use crate::{config::SocialInstance, format_utc_date};
@@ -27,17 +27,16 @@ struct Record {
     r#type: &'static str,
     text: String,
     create_at: String,
-    // langs: Vec<String>,
+    langs: Vec<String>,
 }
 
 impl Record {
     fn new(text: String, lang: &Lang) -> Self {
         Self {
             r#type: "app.bsky",
-            create_at: format_utc_date(&OffsetDateTime::now_utc())
-                .expect("OffsetDateTime corrupted"),
+            create_at: format_utc_date(&Utc::now()),
             text,
-            // langs: vec![lang.0.clone()],
+            langs: vec![lang.0.clone()],
         }
     }
 }
@@ -58,7 +57,7 @@ impl<'a> RecordCreation<'a> {
     fn new(session: &'a Session, text: String, lang: &Lang) -> Self {
         Self {
             repo: &session.did,
-            collection: "app.bsky",
+            collection: "app.bsky.feed.post",
             record: Record::new(text, lang),
         }
     }

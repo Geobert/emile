@@ -6,9 +6,9 @@ use std::{
 };
 
 use anyhow::{Context, Result};
+use chrono::{DateTime, Utc};
 use notify::RecursiveMode;
 use notify_debouncer_mini::DebouncedEvent;
-use time::OffsetDateTime;
 use tokio::sync::mpsc::UnboundedSender;
 use tracing::{debug, error, info};
 
@@ -17,20 +17,20 @@ use crate::{config::SiteConfig, post::extract_date, zola_build};
 #[derive(Debug)]
 pub enum SchedulerEvent {
     Changed,
-    Scheduled(OffsetDateTime),
+    Scheduled(DateTime<Utc>),
 }
 
 #[derive(Debug)]
 pub struct SiteWatcher {
-    pub scheduled: Mutex<BTreeMap<OffsetDateTime, Vec<PathBuf>>>,
-    pub index: Mutex<BTreeMap<PathBuf, OffsetDateTime>>,
+    pub scheduled: Mutex<BTreeMap<DateTime<Utc>, Vec<PathBuf>>>,
+    pub index: Mutex<BTreeMap<PathBuf, DateTime<Utc>>>,
 }
 
 impl SiteWatcher {
     pub fn new(cfg: &SiteConfig) -> Result<Self> {
         // read scheduled posts and see if any needs publishing
         let sched_dir = &cfg.schedule_dir;
-        let mut scheduled: BTreeMap<OffsetDateTime, Vec<PathBuf>> = BTreeMap::new();
+        let mut scheduled: BTreeMap<DateTime<Utc>, Vec<PathBuf>> = BTreeMap::new();
         let mut index = BTreeMap::new();
 
         info!(
@@ -45,7 +45,8 @@ impl SiteWatcher {
                     continue;
                 }
                 let date = extract_date(&path, cfg)
-                    .with_context(|| format!("error extracting date from {file_name:?}"))?;
+                    .with_context(|| format!("error extracting date from {file_name:?}"))?
+                    .to_utc();
                 let file_name = PathBuf::from(file_name);
                 scheduled
                     .entry(date)
@@ -108,6 +109,7 @@ pub async fn start_watching(
         publish_dest: cfg.publish_dest.clone(),
         schedule_dir: schedule_abs_dir,
         timezone: cfg.timezone,
+        default_sch_time: cfg.default_sch_time,
         debouncing: cfg.debouncing,
         social: cfg.social.clone(),
     };
@@ -178,6 +180,7 @@ fn process_schedule_evt(path: &Path, s: Arc<SiteWatcher>, cfg: &SiteConfig) {
         true => match extract_date(path, cfg) {
             Ok(date) => {
                 info!("Process file modification: {:?}", path);
+                let date = date.to_utc();
                 match (s.index.lock(), s.scheduled.lock()) {
                     (Ok(mut index), Ok(mut scheduled)) => {
                         // search if path already scheduled

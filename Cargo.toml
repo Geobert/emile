@@ -15,7 +15,6 @@ serde_derive = "1.0.198"
 slug = "0.1.5"
 notify = { version = "6.1.1", default-features = false }
 clap = { version = "4.5.4", features = ["derive"] }
-time = { version = "0.3.36", features = ["formatting", "parsing", "macros"] }
 lazy_static = "1.4.0"
 tokio = { version = "1.37.0", features = ["sync", "macros", "rt-multi-thread", "time"] }
 notify-debouncer-mini = { version = "0.4.1", default-features = false }
@@ -26,4 +25,7 @@ reqwest = { version = "0.12.4", default-features = false, features = ["json", "r
 sha2 = "0.10.8"
 url = { version = "2.5.0", features = ["serde"] }
 serde_json = "1.0.117"
+chrono = { version = "0.4.38", default-features = false, features = ["std", "alloc", "clock", "now", "serde"]}
+regex = "1.10.4"
+human-date-parser = "0.1.2"
 

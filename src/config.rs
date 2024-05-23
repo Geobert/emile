@@ -4,8 +4,8 @@ use std::io::{prelude::*, BufReader};
 use std::path::{Path, PathBuf};
 
 use anyhow::{bail, Result};
+use chrono::{FixedOffset, NaiveTime};
 use serde_derive::Deserialize;
-use time::UtcOffset;
 
 #[derive(Debug)]
 pub struct SiteConfig {
@@ -20,9 +20,11 @@ pub struct SiteConfig {
     // Schedule directory
     pub schedule_dir: PathBuf,
     // timezone in which the posts are dated, relative to UTC
-    pub timezone: UtcOffset,
+    pub timezone: FixedOffset,
     // how long (in seconds) to wait for end of filesystem event
     pub debouncing: u64,
+    // time to use if no time given in schedule command
+    pub default_sch_time: NaiveTime,
     // social media configuration
     pub social: Option<SocialCfg>,
 }
@@ -112,9 +114,11 @@ pub struct SiteConfigBuilder {
     // Schedule directory
     pub schedule_dir: Option<PathBuf>,
     // timezone in which the posts are dated, relative to UTC
-    pub timezone: Option<i8>,
+    pub timezone: Option<i32>,
     // how long (in seconds) to wait for end of filesystem event (10s by default)
     pub debouncing: Option<u64>,
+    // time to use if no time given in schedule command
+    pub default_sch_time: Option<NaiveTime>,
     // social media configuration
     pub social: Option<SocialCfgBuilder>,
 }
@@ -217,11 +221,14 @@ impl SiteConfigBuilder {
             timezone: cfg_builder
                 .timezone
                 .map(|t| {
-                    UtcOffset::from_hms(t, 0, 0)
-                        .unwrap_or_else(|_| panic!("Error constructing UtcOffset with {t}"))
+                    FixedOffset::east_opt(t * 3600)
+                        .unwrap_or_else(|| panic!("Error constructing FixedOffset with {t}"))
                 })
-                .unwrap_or(UtcOffset::UTC),
+                .unwrap_or(FixedOffset::east_opt(0).unwrap()),
             debouncing: cfg_builder.debouncing.unwrap_or(2),
+            default_sch_time: cfg_builder
+                .default_sch_time
+                .unwrap_or_else(|| NaiveTime::from_hms_opt(12, 0, 0).unwrap()),
             social,
         };
 
@@ -237,8 +244,9 @@ impl Default for SiteConfig {
             draft_template: "draft.html".to_string(),
             publish_dest: PathBuf::from("content/posts"),
             schedule_dir: PathBuf::from("content/drafts/schedule"),
-            timezone: UtcOffset::UTC,
+            timezone: FixedOffset::east_opt(0).unwrap(),
             debouncing: 2,
+            default_sch_time: NaiveTime::from_hms_opt(12, 0, 0).unwrap(),
             social: None,
         }
     }

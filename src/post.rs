@@ -5,9 +5,7 @@ use std::{
 };
 
 use anyhow::{bail, Result};
-use time::{
-    format_description::well_known::Rfc3339, macros::format_description, Date, OffsetDateTime,
-};
+use chrono::{DateTime, FixedOffset, NaiveDate};
 
 use crate::config::SiteConfig;
 
@@ -47,7 +45,7 @@ pub fn modify_front(
     }
 }
 
-pub fn extract_date(path: &Path, cfg: &SiteConfig) -> Result<OffsetDateTime> {
+pub fn extract_date(path: &Path, cfg: &SiteConfig) -> Result<DateTime<FixedOffset>> {
     let file = File::open(path)?;
     let reader = BufReader::new(&file);
     let mut in_front = true;
@@ -67,11 +65,12 @@ pub fn extract_date(path: &Path, cfg: &SiteConfig) -> Result<OffsetDateTime> {
                 }
                 let date_str = date_split.get(1).unwrap().trim();
                 let date = if date_str.len() == 10 {
-                    Date::parse(date_str, &format_description!("[year]-[month]-[day]"))?
-                        .with_hms(0, 0, 0)?
-                        .assume_offset(cfg.timezone)
+                    let date_time = NaiveDate::parse_from_str(date_str, "%Y-%m-%d")?
+                        .and_hms_opt(0, 0, 0)
+                        .expect("Creation of NaiveDateTime blew up");
+                    DateTime::from_naive_utc_and_offset(date_time, cfg.timezone)
                 } else {
-                    OffsetDateTime::parse(date_str, &Rfc3339)?
+                    DateTime::parse_from_rfc3339(date_str)?
                 };
                 return Ok(date);
             }

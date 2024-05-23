@@ -1,16 +1,19 @@
 use std::{
-    path::PathBuf,
+    path::{Path, PathBuf},
     sync::{Arc, Mutex},
 };
 
+use anyhow::{bail, Context, Result};
+use chrono::{DateTime, FixedOffset, Utc};
 use lazy_static::lazy_static;
-use time::OffsetDateTime;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 use tracing::{debug, error, info, warn};
 
 use crate::{
     config::SiteConfig,
-    publish::publish_post,
+    format_date,
+    post::modify_front,
+    publish::{does_same_title_exist, publish_post},
     watcher::{SchedulerEvent, SiteWatcher},
 };
 
@@ -51,6 +54,72 @@ lazy_static! {
     static ref SCHEDULED: Arc<Mutex<Option<Scheduled>>> = Arc::new(Mutex::new(None));
 }
 
+pub fn schedule_post(date: &DateTime<FixedOffset>, post: &Path, cfg: &SiteConfig) -> Result<()> {
+    if !post
+        .canonicalize()
+        .with_context(|| format!("canonicalize() of `{}` failed", post.to_string_lossy()))?
+        .starts_with(cfg.drafts_creation_dir.canonicalize().with_context(|| {
+            format!(
+                "canonicalize() of `{}` failed",
+                cfg.drafts_creation_dir.to_string_lossy()
+            )
+        })?)
+    {
+        bail!(
+            "Post must be in {}",
+            cfg.drafts_creation_dir.to_string_lossy()
+        );
+    }
+
+    if !post
+        .extension()
+        .map(|ext| ext.to_string_lossy().to_lowercase() == "md")
+        .unwrap_or(false)
+        || !post.is_file()
+    {
+        bail!("Post must be a markdown file with `md` extensions");
+    }
+
+    if !post.exists() {
+        bail!("Post `{}` not found", post.to_string_lossy());
+    }
+
+    let content = modify_front(post, |cur_line: &str| {
+        let modified = if cur_line.starts_with("date = ") {
+            // modify date
+            format!("date = {}\n", format_date(&date))
+        } else {
+            // don’t modify
+            format!("{cur_line}\n")
+        };
+        Ok(modified)
+    })?;
+
+    let filename = post.file_name().expect("Post must be a file");
+    let dest = cfg.schedule_dir.join(filename);
+    if dest.exists() {
+        bail!("file {} already exists.", dest.to_string_lossy());
+    }
+
+    if let Some(similar_file) =
+        does_same_title_exist(&filename.to_string_lossy(), &cfg.publish_dest)?
+    {
+        bail!(
+            "Warning: a post with a the same title exists: `{}`",
+            similar_file.file_name().to_string_lossy()
+        );
+    }
+
+    std::fs::write(&dest, &content)?;
+    std::fs::remove_file(&post)?;
+    println!(
+        "Moved `{}` to scheduled folder with date {}",
+        filename.to_string_lossy(),
+        format_date(&date)
+    );
+    Ok(())
+}
+
 async fn schedule_next(
     watcher: Arc<SiteWatcher>,
     cfg: &SiteConfig,
@@ -79,7 +148,7 @@ async fn schedule_next(
 
 struct ParseResult {
     tx: tokio::sync::oneshot::Sender<()>,
-    date_to_remove: Vec<OffsetDateTime>,
+    date_to_remove: Vec<DateTime<Utc>>,
     path_to_remove: Vec<PathBuf>,
 }
 
@@ -95,7 +164,7 @@ async fn parse_scheduled(
 
     match watcher.scheduled.lock() {
         Ok(scheduled) => {
-            let now = OffsetDateTime::now_utc();
+            let now = Utc::now();
             for (date, paths) in scheduled.iter() {
                 let date = *date;
                 if date <= now {
@@ -103,18 +172,13 @@ async fn parse_scheduled(
                     date_to_remove.push(date);
                     for path in paths {
                         path_to_remove.push((*path).clone());
-                        path_to_publish.push(
-                            path.file_stem()
-                                .expect("Should have filename")
-                                .to_string_lossy()
-                                .to_string(),
-                        );
+                        path_to_publish.push((*path).clone());
                     }
                 } else {
                     let (tx, rx) = tokio::sync::oneshot::channel();
 
                     let duration = date - now;
-                    let duration = std::time::Duration::from_secs(duration.whole_seconds() as u64);
+                    let duration = std::time::Duration::from_secs(duration.num_seconds() as u64);
                     info!(
                         "Did a new schedule, duration until next publication: {}s ({})",
                         duration.as_secs(),
@@ -139,8 +203,8 @@ async fn parse_scheduled(
         Err(err) => error!("Error getting lock on SiteWatcher: {:?}", err),
     }
 
-    for path in path_to_publish {
-        match publish_post(&path, &cfg.schedule_dir, cfg).await {
+    for path in &path_to_publish {
+        match publish_post(path, cfg).await {
             Ok(dest) => {
                 info!("Scheduled post published: {}", dest)
             }
@@ -182,14 +246,9 @@ pub async fn start_scheduler(
                     match (watcher.scheduled.lock(), watcher.index.lock()) {
                         (Ok(mut scheduled), Ok(mut index)) => match scheduled.remove(&date) {
                             Some(paths) => {
-                                for path in paths {
-                                    index.remove(&path);
-                                    paths_to_publish.push(
-                                        path.file_stem()
-                                            .expect("Should have filename")
-                                            .to_string_lossy()
-                                            .to_string(),
-                                    );
+                                for path in &paths {
+                                    index.remove(path);
+                                    paths_to_publish.push(path.clone());
                                 }
                             }
                             None => {
@@ -201,8 +260,8 @@ pub async fn start_scheduler(
                         }
                     }
 
-                    for path in paths_to_publish {
-                        match publish_post(&path, &cfg.schedule_dir, &cfg).await {
+                    for path in &paths_to_publish {
+                        match publish_post(path, &cfg).await {
                             Ok(dest) => {
                                 info!("Scheduled post published: {}", dest);
                             }

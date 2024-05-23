@@ -1,9 +1,8 @@
-use std::fs;
 use std::path::PathBuf;
 
 use anyhow::{bail, Result};
+use chrono::{DateTime, Datelike, Local, NaiveDate, Timelike};
 use slug::slugify;
-use time::OffsetDateTime;
 
 use crate::config::SiteConfig;
 use crate::format_date;
@@ -11,13 +10,23 @@ use crate::post::modify_front;
 
 pub fn create_draft(title: &str, cfg: &SiteConfig) -> Result<()> {
     if !cfg.drafts_creation_dir.exists() {
-        fs::create_dir_all(&cfg.drafts_creation_dir)?;
+        std::fs::create_dir_all(&cfg.drafts_creation_dir)?;
     }
 
     let date = {
-        let today = OffsetDateTime::now_utc();
-        let today = today.replace_year(today.year() + cfg.drafts_year_shift)?;
-        today.replace_offset(cfg.timezone)
+        let today = Local::now();
+        let date = NaiveDate::from_ymd_opt(
+            today.year() + cfg.drafts_year_shift,
+            today.month(),
+            today.day(),
+        )
+        .expect(&format!(
+            "`drafts_year_shift` value `{}` made creation of chrono::NaiveDate fail",
+            cfg.drafts_year_shift
+        ))
+        .and_hms_opt(today.hour(), today.minute(), today.day())
+        .unwrap();
+        DateTime::from_naive_utc_and_offset(date, cfg.timezone)
     };
 
     let slug = slugify(title);
@@ -37,7 +46,7 @@ pub fn create_draft(title: &str, cfg: &SiteConfig) -> Result<()> {
             if line.starts_with("+++") {
                 Ok(format!(
                     "+++\ntitle = \"{title}\"\ndate = {}\ndraft = true\n",
-                    format_date(&date)?
+                    format_date(&date)
                 ))
             } else {
                 Ok(format!("{line}\n"))
@@ -46,10 +55,10 @@ pub fn create_draft(title: &str, cfg: &SiteConfig) -> Result<()> {
     } else {
         format!(
             "+++\ntitle = \"{title}\"\ndate = {}\ndraft = true\n+++\n",
-            format_date(&date)?
+            format_date(&date)
         )
     };
-    fs::write(&dest, new_content)?;
+    std::fs::write(&dest, new_content)?;
     println!("Success: post `{}` created.", &dest.to_string_lossy());
     Ok(())
 }

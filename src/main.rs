@@ -1,6 +1,7 @@
-use std::{io::Write, sync::Arc};
+use std::{borrow::Cow, io::Write, sync::Arc};
 
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Error, Result};
+use chrono::{DateTime, Datelike, Days, FixedOffset, Local, NaiveTime, Timelike, Utc};
 use clap::Parser;
 use config::SiteConfigBuilder;
 
@@ -14,9 +15,9 @@ mod social;
 mod watcher;
 
 use opt::{Commands, Opt};
-use time::{macros::format_description, OffsetDateTime};
+use regex::Regex;
 use tracing::error;
-use tracing_subscriber::{fmt::time::UtcTime, prelude::*, util::SubscriberInitExt, EnvFilter};
+use tracing_subscriber::{fmt::time::UtcTime, prelude::*, EnvFilter};
 use watcher::SiteWatcher;
 
 #[tokio::main]
@@ -34,9 +35,7 @@ async fn main() -> Result<()> {
             .with(
                 tracing_subscriber::fmt::layer()
                     .compact()
-                    .with_timer(UtcTime::new(format_description!(
-                        "[year repr:last_two]-[month]-[day] [hour]:[minute]:[second]"
-                    )))
+                    .with_timer(UtcTime::rfc_3339())
                     .with_writer(non_blocking)
                     .with_target(false),
             )
@@ -48,9 +47,7 @@ async fn main() -> Result<()> {
             .with(
                 tracing_subscriber::fmt::layer()
                     .compact()
-                    .with_timer(UtcTime::new(format_description!(
-                        "[year repr:last_two]-[month]-[day] [hour]:[minute]:[second]"
-                    )))
+                    .with_timer(UtcTime::rfc_3339())
                     .with_target(false),
             )
             .with(EnvFilter::try_from_env("EMILE_LOG").or_else(|_| EnvFilter::try_new("info"))?)
@@ -63,9 +60,9 @@ async fn main() -> Result<()> {
             let cfg = SiteConfigBuilder::get_config();
             new::create_draft(&title, &cfg)
         }
-        Commands::Publish { slug } => {
+        Commands::Publish { post } => {
             let cfg = SiteConfigBuilder::get_config();
-            let dest = publish::publish_post(&slug, &cfg.drafts_creation_dir, &cfg).await?;
+            let dest = publish::publish_post(&post, &cfg).await?;
             zola_build()?;
             println!("Success: post `{dest}` published.");
             Ok(())
@@ -92,6 +89,11 @@ async fn main() -> Result<()> {
 
             watcher::start_watching(change_watcher, cfg, tx_scheduler).await?;
             Ok(())
+        }
+        Commands::Schedule { time, post } => {
+            let cfg = SiteConfigBuilder::get_config();
+            let date = parse_time(&time, &cfg.default_sch_time)?;
+            scheduler::schedule_post(&date, &post, &cfg)
         }
     }
 }
@@ -121,14 +123,64 @@ fn zola_build() -> Result<()> {
     }
 }
 
-fn format_date(date: &OffsetDateTime) -> Result<String> {
-    Ok(date.format(&format_description!(
-        "[year]-[month]-[day]T[hour]:[minute]:[second][offset_hour sign:mandatory]:[offset_minute]"
-    ))?)
+fn parse_time(time_str: &str, default_time: &NaiveTime) -> Result<DateTime<FixedOffset>, Error> {
+    let now = Local::now();
+    let time_str = fix_time(time_str, &now);
+    let datetime = match human_date_parser::from_human_time(&time_str)? {
+        human_date_parser::ParseResult::DateTime(d) => d.fixed_offset(),
+        human_date_parser::ParseResult::Date(d) => d
+            .and_hms_opt(
+                default_time.hour(),
+                default_time.minute(),
+                default_time.second(),
+            )
+            .unwrap()
+            .and_local_timezone(now.timezone())
+            .unwrap()
+            .into(),
+        human_date_parser::ParseResult::Time(t) => {
+            let now_time = now.time();
+            let date = if t < now_time {
+                now.checked_add_days(Days::new(1)).with_context(|| {
+                    format!(
+                        "Failed to add one day to `{}`",
+                        format_date(&now.fixed_offset())
+                    )
+                })?
+            } else {
+                now
+            };
+            match date.with_time(t) {
+                chrono::offset::MappedLocalTime::Single(dt) => dt.fixed_offset(),
+                chrono::offset::MappedLocalTime::Ambiguous(_, dt) => dt.fixed_offset(),
+                chrono::offset::MappedLocalTime::None => bail!("Parsing time blew up"),
+            }
+        }
+    };
+
+    Ok(datetime)
 }
 
-fn format_utc_date(date: &OffsetDateTime) -> Result<String> {
-    Ok(date.format(&format_description!(
-        "[year]-[month]-[day]T[hour]:[minute]:[second]Z"
-    ))?)
+// We accept omitted year and month. This function construct a minimal valid input to be parsed
+fn fix_time<'a>(s: &'a str, now: &DateTime<Local>) -> Cow<'a, str> {
+    let day = Regex::new("^[0-3]?[0-9]$").expect("Failure compiling day regex");
+    if day.is_match(s) {
+        return Cow::Owned(format!("{}-{}-{s}", now.year(), now.month()));
+    }
+
+    let month_day =
+        Regex::new(r"^[0-1]?[0-9]\-[0-3]?[0-9]$").expect("Failure compiling month regex");
+    if month_day.is_match(s) {
+        return Cow::Owned(format!("{}-{s}", now.year()));
+    }
+
+    Cow::Borrowed(s)
+}
+
+fn format_date(date: &DateTime<FixedOffset>) -> String {
+    date.format("%Y-%m-%dT%H:%M:%S%:z").to_string()
+}
+
+fn format_utc_date(date: &DateTime<Utc>) -> String {
+    date.format("%Y-%m-%dT%H:%M:%SZ").to_string()
 }
