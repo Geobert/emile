@@ -204,6 +204,7 @@ async fn parse_scheduled(
     }
 
     for path in &path_to_publish {
+        let path = &cfg.schedule_dir.join(path);
         match publish_post(path, cfg).await {
             Ok(dest) => {
                 info!("Scheduled post published: {}", dest)
@@ -261,6 +262,7 @@ pub async fn start_scheduler(
                     }
 
                     for path in &paths_to_publish {
+                        let path = &cfg.schedule_dir.join(path);
                         match publish_post(path, &cfg).await {
                             Ok(dest) => {
                                 info!("Scheduled post published: {}", dest);
