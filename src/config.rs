@@ -11,7 +11,7 @@ use serde_derive::Deserialize;
 pub struct SiteConfig {
     // drafts created with `new` command will end here. Path relative to root of the blog.
     pub drafts_creation_dir: PathBuf,
-    // emile will add this amount of year to the drafts to make it top of the list
+    // on `new`, emile will add this amount of year to the drafts to make it top of the list
     pub drafts_year_shift: i32,
     // emile will take this file to create a draft post by adding `title`, `date` and `draft = true` in the frontmatter
     pub draft_template: String,
