@@ -1,7 +1,7 @@
-use anyhow::Result;
-use reqwest::Url;
+use anyhow::{bail, Result};
+use reqwest::{StatusCode, Url};
 use serde_derive::{Deserialize, Serialize};
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 use crate::config::SocialInstance;
 
@@ -42,18 +42,24 @@ pub async fn push_to_mastodon(
     use sha2::{Digest, Sha256};
     let hash = format!("{:x}", Sha256::digest(toot.status.as_bytes()));
 
-    let status = reqwest::Client::new()
+    let res = reqwest::Client::new()
         .post(&format!("https://{}/api/v1/statuses", instance.server))
         .bearer_auth(&token)
         .header("Idempotency-Key", hash)
         .json(&toot)
         .send()
-        .await?
-        .json::<Status>()
         .await?;
 
+    if res.status() != StatusCode::OK {
+        let status = res.status();
+        let text = res.text().await?;
+        bail!("Failed to push to Mastodon: {status}, {text}");
+    }
+
+    let status = res.json::<Status>().await?;
+
     // bookmark it to avoid deletion and for easy retrieval
-    reqwest::Client::new()
+    let res = reqwest::Client::new()
         .post(&format!(
             "https://{}/api/v1/statuses/{}/bookmark",
             instance.server, status.id
@@ -61,6 +67,12 @@ pub async fn push_to_mastodon(
         .bearer_auth(token)
         .send()
         .await?;
+
+    if res.status() != StatusCode::OK {
+        let status = res.status();
+        let text = res.text().await?;
+        warn!("Failed to bookmark toot: {status}, {text}");
+    }
 
     Ok(Some(Url::parse(&status.uri)?))
 }

@@ -16,7 +16,7 @@ mod watcher;
 
 use opt::{Commands, Opt};
 use regex::Regex;
-use tracing::error;
+use tracing::{error, info};
 use tracing_subscriber::{fmt::time::UtcTime, prelude::*, EnvFilter};
 use watcher::SiteWatcher;
 
@@ -54,6 +54,8 @@ async fn main() -> Result<()> {
             .init();
         None
     };
+
+    info!("emile {}", clap::crate_version!());
 
     match opt.command {
         Commands::New { title } => {

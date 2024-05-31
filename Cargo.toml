@@ -1,6 +1,6 @@
 [package]
 name = "emile"
-version = "0.5.0"
+version = "0.5.1"
 authors = ["Geobert Quach <geobert@proton.me>"]
 edition = "2021"
 
@@ -14,7 +14,7 @@ serde = "1.0.203"
 serde_derive = "1.0.203"
 slug = "0.1.5"
 notify = { version = "6.1.1", default-features = false }
-clap = { version = "4.5.4", features = ["derive"] }
+clap = { version = "4.5.4", features = ["derive", "cargo"] }
 lazy_static = "1.4.0"
 tokio = { version = "1.37.0", features = ["sync", "macros", "rt-multi-thread", "time"] }
 notify-debouncer-mini = { version = "0.4.1", default-features = false }

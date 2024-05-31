@@ -194,7 +194,7 @@ impl SiteConfigBuilder {
                 .unwrap_or_else(|| PathBuf::from("social_link.txt")),
             link_tag: cfg_builder
                 .link_tag
-                .unwrap_or("{% emile_social %}".to_owned()),
+                .unwrap_or("{$ emile_social $}".to_owned()),
             instances: cfg_builder.instances,
         });
 
@@ -211,7 +211,7 @@ impl SiteConfigBuilder {
             drafts_year_shift: cfg_builder.drafts_year_shift.unwrap_or(0),
             draft_template: cfg_builder
                 .draft_template
-                .unwrap_or_else(|| "draft.html".to_string()),
+                .unwrap_or_else(|| "draft.txt".to_string()),
             publish_dest: cfg_builder
                 .publish_dest
                 .unwrap_or_else(|| PathBuf::from("content/posts")),

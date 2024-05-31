@@ -46,7 +46,7 @@ drafts_year_shift = 0
 
 # emile will take this file to create a draft post by adding `title`, `date` and 
 #`draft = true` in the frontmatter 
-draft_template = "templates/draft.html"
+draft_template = "draft.txt"
 
 # Destination for `publish` command.
 publish_dest = "content/"
@@ -75,7 +75,7 @@ link_template = "social_link.txt"
 
 # tag to put in the blog post, to be replaced by the `link_template` snippet to have link 
 # to social media post
-link_tag = "{% emile_social %}"
+link_tag = "{$ emile_social $}"
 
 # if a tag match, use the associated lang (ex: [{ tag = "english", lang = "en" }])
 tag_lang = []
@@ -83,7 +83,7 @@ tag_lang = []
 # tag in the list will not be in the social post (ex: ["english", "misc"])
 filtered_tag = []
 
-# social instances to post to. One per `api` (accepled values are "mastodon" or "bluesky"). 
+# social instances to post to. One per `api` (accepted values are "mastodon" or "bluesky"). 
 #`*_var` are environment variable to read the needed value from. If `social` is present, 
 # it cannot be empty
 # ex: 
@@ -189,7 +189,8 @@ in `social_template`.
 ### Social media link
 
 `emile` can add links to the social media posts it created so people can react on your
-article. 
+article. The tag defined by `link_tag` will be replaced by the expanded template
+`link_template`.
 
 The file specified in `link_template` must be in the `/template` directory. It must
 contains one `{links}` (plural) tag which will be expanded to a list of links to the
