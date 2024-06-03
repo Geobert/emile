@@ -53,11 +53,22 @@ pub async fn publish_post(post: &Path, cfg: &SiteConfig) -> Result<String> {
         );
     }
 
-    fs::write(&dest, &new_content)?;
-    fs::remove_file(&post)?;
-
     if let Some(social_cfg) = cfg.social.as_ref() {
-        push_to_social(social_cfg, &new_content, &dest).await?;
+        match push_to_social(social_cfg, &new_content, &dest).await {
+            Ok(new_content) => {
+                fs::write(&dest, &new_content)?;
+                fs::remove_file(&post)?;
+            }
+            Err(e) => {
+                // write the post even if social media failed
+                fs::write(&dest, &new_content)?;
+                fs::remove_file(&post)?;
+                return Err(e);
+            }
+        }
+    } else {
+        fs::write(&dest, &new_content)?;
+        fs::remove_file(&post)?;
     }
 
     Ok(dest.to_string_lossy().to_string())

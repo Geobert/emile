@@ -10,7 +10,7 @@ use std::{
 use anyhow::{anyhow, bail, Result};
 use reqwest::Url;
 use serde_derive::Deserialize;
-use tracing::error;
+use tracing::{error, info};
 
 use crate::{
     config::{SocialApi, SocialCfg},
@@ -239,7 +239,7 @@ fn create_toot_link(
     Ok(tpl.replace("{links}", links))
 }
 
-pub async fn push_to_social(cfg: &SocialCfg, content: &str, dest: &Path) -> Result<()> {
+pub async fn push_to_social(cfg: &SocialCfg, content: &str, dest: &Path) -> Result<String> {
     if cfg.instances.is_empty() {
         bail!("No social servers defined.");
     }
@@ -270,11 +270,12 @@ pub async fn push_to_social(cfg: &SocialCfg, content: &str, dest: &Path) -> Resu
             acc
         });
 
+    info!("Inject social links: {links:?}");
+
     let new_content = content.replace(
         &cfg.link_tag,
         &create_toot_link(&templates_dir, cfg, &language, &links)?,
     );
-    std::fs::write(dest, new_content)?;
 
-    Ok(())
+    Ok(new_content)
 }
