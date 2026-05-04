@@ -1,31 +1,50 @@
 [package]
 name = "emile"
-version = "0.5.3"
+version = "0.5.4"
 authors = ["Geobert Quach <geobert@proton.me>"]
-edition = "2021"
+edition = "2024"
 
 [badges]
 azure-devops = { project = "geobert/emile", pipeline = "emile-CI", build = "2" }
 
 [dependencies]
-anyhow = "1.0.86"
-toml = "0.8"
-serde = "1.0.203"
-serde_derive = "1.0.203"
-slug = "0.1.5"
-notify = { version = "6.1.1", default-features = false }
-clap = { version = "4.5.4", features = ["derive", "cargo"] }
-lazy_static = "1.4.0"
-tokio = { version = "1.37.0", features = ["sync", "macros", "rt-multi-thread", "time"] }
-notify-debouncer-mini = { version = "0.4.1", default-features = false }
-tracing = "0.1.40"
-tracing-appender = "0.2.3"
-tracing-subscriber = { version = "0.3.18", default-features = false, features = ["std", "env-filter", "fmt", "smallvec", "parking_lot", "registry", "time"] }
-reqwest = { version = "0.12.4", default-features = false, features = ["json", "rustls-tls"] }
-sha2 = "0.10.8"
-url = { version = "2.5.0", features = ["serde"] }
-serde_json = "1.0.117"
-chrono = { version = "0.4.38", default-features = false, features = ["std", "alloc", "clock", "now", "serde"]}
-regex = "1.10.4"
-human-date-parser = "0.1.2"
-
+anyhow = "1.0.102"
+toml = "1.1"
+serde = "1.0.228"
+serde_derive = "1.0.228"
+slug = "0.1.6"
+notify = { version = "8.2.0", default-features = false }
+clap = { version = "4.6.1", features = ["derive", "cargo"] }
+lazy_static = "1.5.0"
+tokio = { version = "1.52.1", features = [
+    "sync",
+    "macros",
+    "rt-multi-thread",
+    "time",
+] }
+notify-debouncer-mini = { version = "0.7.0", default-features = false }
+tracing = "0.1.44"
+tracing-appender = "0.2.5"
+tracing-subscriber = { version = "0.3.23", default-features = false, features = [
+    "std",
+    "env-filter",
+    "fmt",
+    "smallvec",
+    "parking_lot",
+    "registry",
+    "time",
+] }
+reqwest = { version = "0.13.3", features = ["json", "query"] }
+sha2 = "0.11.0"
+url = { version = "2.5.8", features = ["serde"] }
+serde_json = "1.0.149"
+chrono = { version = "0.4.44", default-features = false, features = [
+    "std",
+    "alloc",
+    "clock",
+    "now",
+    "serde",
+] }
+regex = "1.12.3"
+human-date-parser = "0.3.1"
+base16ct = { version = "1.0.0", features = ["alloc"] }

@@ -1,4 +1,5 @@
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
+use base16ct::HexDisplay;
 use reqwest::{StatusCode, Url};
 use serde_derive::{Deserialize, Serialize};
 use tracing::{error, info, warn};
@@ -40,7 +41,8 @@ pub async fn push_to_mastodon(
     };
 
     use sha2::{Digest, Sha256};
-    let hash = format!("{:x}", Sha256::digest(toot.status.as_bytes()));
+    let digest = Sha256::digest(toot.status.as_bytes());
+    let hash = format!("{:x}", HexDisplay(&digest));
 
     let res = reqwest::Client::new()
         .post(&format!("https://{}/api/v1/statuses", instance.server))

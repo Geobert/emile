@@ -1,6 +1,6 @@
 use std::{borrow::Cow, io::Write, sync::Arc};
 
-use anyhow::{bail, Context, Error, Result};
+use anyhow::{Context, Error, Result, bail};
 use chrono::{
     DateTime, Datelike, Days, FixedOffset, Local, Months, NaiveDate, NaiveTime, TimeZone, Timelike,
     Utc,
@@ -20,7 +20,7 @@ mod watcher;
 use opt::{Commands, Opt};
 use regex::Regex;
 use tracing::{error, info};
-use tracing_subscriber::{fmt::time::UtcTime, prelude::*, EnvFilter};
+use tracing_subscriber::{EnvFilter, fmt::time::UtcTime, prelude::*};
 use watcher::SiteWatcher;
 
 #[tokio::main]
@@ -134,10 +134,12 @@ fn parse_time_with_ref(
     default_time: &NaiveTime,
 ) -> Result<DateTime<FixedOffset>, Error> {
     let time_str = fix_time(time_str, &ref_date);
-    let datetime = match human_date_parser::from_human_time(&time_str)
+    let datetime = match human_date_parser::from_human_time(&time_str, Local::now().naive_local())
         .with_context(|| format!("Failure parsing `{time_str}`"))?
     {
-        human_date_parser::ParseResult::DateTime(d) => d.fixed_offset(),
+        human_date_parser::ParseResult::DateTime(d) => {
+            d.and_local_timezone(ref_date.timezone()).unwrap().into()
+        }
         human_date_parser::ParseResult::Date(d) => {
             let datetime: DateTime<FixedOffset> = d
                 .and_hms_opt(
