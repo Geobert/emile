@@ -7,8 +7,11 @@ use std::{
 
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
-use notify::RecursiveMode;
-use notify_debouncer_mini::DebouncedEvent;
+use notify::{
+    RecursiveMode,
+    event::{CreateKind, RemoveKind},
+};
+use notify_debouncer_full::DebouncedEvent;
 use tokio::sync::mpsc::UnboundedSender;
 use tracing::{debug, error, info};
 
@@ -72,30 +75,29 @@ pub async fn start_watching(
 
     info!("Starting watcher…");
     let mut debouncer =
-        notify_debouncer_mini::new_debouncer(Duration::from_secs(cfg.debouncing), tx)
+        notify_debouncer_full::new_debouncer(Duration::from_secs(cfg.debouncing), None, tx)
             .with_context(|| "Failed to create watcher")?;
-    let watcher = debouncer.watcher();
 
     let current_dir = std::env::current_dir().with_context(|| "Failed to get current dir")?;
 
     let dir = current_dir.join("content");
-    watcher
+    debouncer
         .watch(&dir, RecursiveMode::Recursive)
         .with_context(|| format!("Failed to start watching on `{dir:?}`"))?;
     let dir = current_dir.join("sass");
-    watcher
+    debouncer
         .watch(&dir, RecursiveMode::Recursive)
         .with_context(|| format!("Failed to start watching on `{dir:?}`"))?;
     let dir = current_dir.join("static");
-    watcher
+    debouncer
         .watch(&dir, RecursiveMode::Recursive)
         .with_context(|| format!("Failed to start watching on `{dir:?}`"))?;
     let dir = current_dir.join("templates");
-    watcher
+    debouncer
         .watch(&dir, RecursiveMode::Recursive)
         .with_context(|| format!("Failed to start watching on `{dir:?}`"))?;
     let dir = current_dir.join("themes");
-    watcher
+    debouncer
         .watch(&dir, RecursiveMode::Recursive)
         .with_context(|| format!("Failed to start watching on `{dir:?}`"))?;
 
@@ -136,42 +138,48 @@ async fn process_evt(
     cfg: &SiteConfig,
     tx_scheduler: &UnboundedSender<SchedulerEvent>,
 ) {
-    let path = &evt.path;
-    debug!("evt receive for path: {:?}", &path);
-    if path.starts_with(&cfg_abs.schedule_dir) {
-        // ignore directory changes for schedule and rsync temp files
-        if path.is_dir()
-            || path
-                .file_name()
-                .map(|v| v.to_string_lossy().starts_with('.'))
-                .unwrap_or(false)
-        {
-            return;
-        }
+    match evt.event.kind {
+        notify::EventKind::Create(CreateKind::File)
+        | notify::EventKind::Remove(RemoveKind::File)
+        | notify::EventKind::Modify(_) => {
+            evt.event.paths.iter().for_each(|path| {
+                debug!("evt receive for path: {:?}", &path);
+                if path.starts_with(&cfg_abs.schedule_dir) {
+                    // ignore directory changes for schedule and rsync temp files
+                    if path.is_dir()
+                        || path
+                            .file_name()
+                            .map(|v| v.to_string_lossy().starts_with('.'))
+                            .unwrap_or(false)
+                    {
+                        return;
+                    }
 
-        process_schedule_evt(path, s, cfg);
-        if let Err(e) = tx_scheduler.send(SchedulerEvent::Changed) {
-            error!("Error sending ScheduleEvent: {:?}", e)
-        }
-    } else if path.starts_with(&cfg_abs.drafts_creation_dir) {
-        // nothing to do
-    } else {
-        // ignore rsync temp files
-        if path
-            .file_name()
-            .map(|v| v.to_string_lossy().starts_with('.'))
-            .unwrap_or(false)
-        {
-            return;
-        }
+                    process_schedule_evt(&path, s.clone(), cfg);
+                    if let Err(e) = tx_scheduler.send(SchedulerEvent::Changed) {
+                        error!("Error sending ScheduleEvent: {:?}", e)
+                    }
+                } else if !path.starts_with(&cfg_abs.drafts_creation_dir) {
+                    // ignore rsync temp files
+                    if path
+                        .file_name()
+                        .map(|v| v.to_string_lossy().starts_with('.'))
+                        .unwrap_or(false)
+                    {
+                        return;
+                    }
 
-        match zola_build() {
-            Ok(_) => info!("Build success after filesystem event ({:?})", evt),
-            Err(err) => error!(
-                "Failed building after filesystem event `{:?}`: {}",
-                evt, err
-            ),
+                    match zola_build() {
+                        Ok(_) => info!("Build success after filesystem event ({:?})", evt),
+                        Err(err) => error!(
+                            "Failed building after filesystem event `{:?}`: {}",
+                            evt, err
+                        ),
+                    }
+                }
+            });
         }
+        _ => return,
     }
 }
 

@@ -1,6 +1,6 @@
 [package]
 name = "emile"
-version = "0.5.4"
+version = "0.5.5"
 authors = ["Geobert Quach <geobert@proton.me>"]
 edition = "2024"
 
@@ -22,7 +22,7 @@ tokio = { version = "1.52.1", features = [
     "rt-multi-thread",
     "time",
 ] }
-notify-debouncer-mini = { version = "0.7.0", default-features = false }
+notify-debouncer-full = "0.7.0"
 tracing = "0.1.44"
 tracing-appender = "0.2.5"
 tracing-subscriber = { version = "0.3.23", default-features = false, features = [
